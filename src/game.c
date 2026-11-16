@@ -15,6 +15,8 @@ static size_t rand_sz(size_t min, size_t max) // [min, max)
 
 static void shuffle_partial_sz(size_t n, size_t arr[static n], size_t lim)
 {
+    assert(lim <= n);
+
     for (size_t i = 0; i < lim; ++i) {
         size_t j = rand_sz(i, n);
         if (i != j) {
@@ -25,24 +27,27 @@ static void shuffle_partial_sz(size_t n, size_t arr[static n], size_t lim)
     }
 }
 
-game_t *game_init(game_t *game, size_t rows, size_t cols, size_t mine_cnt)
+game_t *game_init(game_t *game, uint16_t rows, uint16_t cols, size_t mine_cnt)
 {
     if (!game)
         return nullptr;
 
-    uint8_t *clue = calloc(rows * cols, sizeof(*clue));
+    if (game->mine_cnt > game->rows * game->cols)
+        return nullptr;
+
+    uint8_t *clue = calloc((size_t)rows * cols, sizeof(*clue));
     if (!clue)
         goto err_cleanup_1;
 
-    bool *is_mine = calloc(rows * cols, sizeof(*is_mine));
+    bool *is_mine = calloc((size_t)rows * cols, sizeof(*is_mine));
     if (!is_mine)
         goto err_cleanup_2;
 
-    bool *revealed = calloc(rows * cols, sizeof(*revealed));
+    bool *revealed = calloc((size_t)rows * cols, sizeof(*revealed));
     if (!revealed)
         goto err_cleanup_3;
 
-    bool *flagged = calloc(rows * cols, sizeof(*flagged));
+    bool *flagged = calloc((size_t)rows * cols, sizeof(*flagged));
     if (!flagged)
         goto err_cleanup_4;
 
@@ -127,10 +132,10 @@ static void game_gen_mines(game_t game[static 1], size_t i_safe, size_t j_safe)
     assert(game);
     assert(i_safe < game->rows);
     assert(j_safe < game->cols);
-    assert(game->mine_cnt <= game->rows * game->cols);
     assert(game->state == STATE_BEGIN);
 
-    size_t *candidates = calloc(game->rows * game->cols, sizeof(*candidates));
+    size_t *candidates =
+        calloc((size_t)game->rows * game->cols, sizeof(*candidates));
     assert(candidates);
     size_t n_candidates = 0;
 

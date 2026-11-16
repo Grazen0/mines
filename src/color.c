@@ -1,6 +1,5 @@
 #include "color.h"
-
-#define MIN(a, b) ((a) < (b) ? (a) : (b))
+#include "extra.h"
 
 color_t color_brighten(color_t color, uint8_t add)
 {

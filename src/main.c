@@ -4,6 +4,7 @@
 #include "game.h"
 #include "input.h"
 #include <assert.h>
+#include <getopt.h>
 #include <signal.h>
 #include <stdarg.h>
 #include <stdatomic.h>
@@ -398,14 +399,106 @@ static void run(game_t game[static 1], tui_t tui[static 1])
     }
 }
 
+static uint16_t max_mine_cnt(uint16_t rows, uint16_t cols)
+{
+    if (rows * cols <= 9)
+        return 0;
+
+    return (rows * cols) - 9;
+}
+
 static void show_cursor()
 {
     printf(SHOW_CURSOR);
 }
 
-int main()
+static const struct option long_options[] = {
+    { "help",       no_argument, nullptr, 'h'},
+    {"mines", required_argument, nullptr, 'm'},
+    {nullptr,                 0, nullptr,   0},
+};
+
+typedef struct {
+    uint16_t rows;
+    uint16_t cols;
+    size_t mine_cnt;
+} args_t;
+
+#define EXE_NAME "mines"
+#define USAGE                                           \
+    "Usage: " EXE_NAME " [rows] [cols]              \n" \
+    "A simple TUI Minesweeper game made in C.       \n" \
+    "                                               \n" \
+    "Arguments:                                     \n" \
+    "  rows   Field height (defaults to 16)         \n" \
+    "  cols   Field width  (defaults to rows)       \n" \
+    "                                               \n" \
+    "Flags:                                         \n" \
+    "  -h, --help   show this help message          \n" \
+    "  -m, --mines  number of mines to place        \n" \
+    "               (default: 16%% of rows x cols)  \n" \
+    "                                               \n" \
+    "Examples:                                      \n" \
+    "  " EXE_NAME "           16x16 field           \n" \
+    "  " EXE_NAME " 10        10x10 field           \n" \
+    "  " EXE_NAME " 10 8      10x8 field            \n"
+
+static constexpr uint16_t DEFAULT_ROWS = 16;
+static constexpr double DEFAULT_MINE_DENSITY = 0.16;
+
+static void parse_args(int argc, char *argv[static argc + 1], args_t *args)
+{
+    if (args)
+        *args = (args_t){};
+
+    args->rows = DEFAULT_ROWS;
+
+    int opt = -1;
+    while ((opt = getopt_long(argc, argv, "hm:", long_options, nullptr)) !=
+           -1) {
+        switch (opt) {
+            case 'h':
+                printf(USAGE);
+                exit(EXIT_SUCCESS);
+            case 'm':
+                args->mine_cnt = strtoul(optarg, nullptr, 10);
+                break;
+            default:
+                fputs(USAGE, stderr);
+                fputs("\n", stderr);
+                fputs("Try '" EXE_NAME " -h' for more information.\n", stderr);
+                exit(EXIT_FAILURE);
+        }
+    }
+
+    if (optind < argc)
+        args->rows = strtoul(argv[optind++], nullptr, 10);
+
+    args->cols = args->rows;
+    if (optind < argc)
+        args->cols = strtoul(argv[optind++], nullptr, 10);
+
+    uint16_t max_mines = max_mine_cnt(args->rows, args->cols);
+
+    if (args->mine_cnt == 0) {
+        uint16_t estimated =
+            (uint16_t)(DEFAULT_MINE_DENSITY * args->rows * args->cols);
+        args->mine_cnt = MIN(estimated, max_mines);
+    }
+
+    if (args->mine_cnt > max_mines) {
+        fprintf(stderr, "too many mines for given dimensions (max = %u)\n",
+                max_mines);
+        exit(EXIT_FAILURE);
+    }
+}
+
+int main(int argc, char *argv[static argc + 1])
 {
     srand(time(nullptr));
+
+    args_t args = {};
+    parse_args(argc, argv, &args);
 
     atexit(show_exit_message);
 
@@ -418,7 +511,7 @@ int main()
     init_sigwinch_handler();
 
     game_t game = {};
-    if (!game_init(&game, 15, 15, 25))
+    if (!game_init(&game, args.rows, args.cols, args.mine_cnt))
         die("game_init");
 
     tui_t tui = {};

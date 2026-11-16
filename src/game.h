@@ -14,14 +14,14 @@ typedef struct {
     bool *is_mine; // rows x cols
     bool *revealed; // rows x cols
     bool *flagged; // rows x cols
-    size_t mine_cnt;
-    size_t flag_cnt;
     uint16_t rows;
     uint16_t cols;
+    uint16_t mine_cnt;
+    uint16_t flag_cnt;
     game_state_t state;
 } game_t;
 
-game_t *game_init(game_t *game, size_t rows, size_t cols, size_t mine_cnt);
+game_t *game_init(game_t *game, uint16_t rows, uint16_t cols, size_t mine_cnt);
 
 void game_deinit(game_t *game);
 
