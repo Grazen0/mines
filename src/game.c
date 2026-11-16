@@ -17,12 +17,14 @@ uint16_t max_mine_cnt(uint16_t rows, uint16_t cols)
 
 static size_t rand_sz(size_t min, size_t max) // [min, max)
 {
+    assert(min < max);
     double r = rand() / ((double)RAND_MAX + 1);
     return min + (size_t)(r * (double)(max - min));
 }
 
 static void shuffle_partial_sz(size_t n, size_t arr[static n], size_t lim)
 {
+    assert(arr);
     assert(lim <= n);
 
     for (size_t i = 0; i < lim; ++i) {
@@ -186,12 +188,16 @@ static size_t count_flags_around(game_t const game[static 1], size_t i,
 
 static void game_win(game_t game[static 1])
 {
-    for (uint16_t pos = 0; pos < game->rows * game->cols; ++pos) {
-        if (game->is_mine[pos]) {
-            assert(!game->revealed[pos]);
-            game->flagged[pos] = true;
-        } else {
-            assert(game->revealed[pos]);
+    for (uint16_t i = 0; i < game->rows; ++i) {
+        for (uint16_t j = 0; j < game->cols; ++j) {
+            size_t pos = (i * game->cols) + j;
+
+            if (game->is_mine[pos]) {
+                if (!game->flagged[pos])
+                    assert(game_toggle_flag(game, i, j));
+            } else {
+                assert(game->revealed[pos]);
+            }
         }
     }
 
