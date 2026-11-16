@@ -18,11 +18,11 @@ inc_dirs = include_directories('src')
 
 sources = [
   'src/ansi.c',
-  'src/color.c',
   'src/extra.c',
   'src/game.c',
   'src/input.c',
   'src/main.c',
+  'src/tui.c',
 ]
 
 exe = executable(

@@ -1,7 +1,6 @@
 #include "input.h"
 #include "ansi.h"
 #include <errno.h>
-#include <stdio.h>
 #include <termios.h>
 #include <unistd.h>
 
@@ -15,16 +14,20 @@ bool enter_raw_mode()
 
     tcgetattr(STDIN_FILENO, &term_old);
     struct termios term_new = term_old;
+
     // - disable software control flow
     // - disable parity checking
     // - strip 8th bit of each input byte
     // - set character size to 8
     term_new.c_iflag &= ~(IXON | INPCK | ISTRIP | CS8);
+
     // - disable output processing (e.g. Converting "\n" to "\r\n")
     term_new.c_oflag &= ~(OPOST);
+
     // - enable canonical mode (no buffering)
     // - disable input echoing
     // - disable implementation-defined input processing
+    // - time out read() after 0.1 seconds
     term_new.c_lflag &= ~(ICANON | ECHO | IEXTEN | ISIG);
     term_new.c_cc[VMIN] = 0;
     term_new.c_cc[VTIME] = 1;
@@ -36,6 +39,9 @@ bool enter_raw_mode()
 
 void exit_raw_mode()
 {
+    if (!raw_init)
+        return;
+
     raw_init = false;
     tcsetattr(STDIN_FILENO, TCSAFLUSH, &term_old);
 }
