@@ -93,7 +93,11 @@ static tui_t tui = {};
 
 int main(int argc, char *argv[static argc + 1])
 {
-    srand(time(nullptr));
+    struct timespec tp = {};
+    if (clock_gettime(CLOCK_REALTIME, &tp) == -1)
+        die("clock_gettime");
+
+    srand(tp.tv_nsec);
 
     args_t args = {};
     parse_args(argc, argv, &args);

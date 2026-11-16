@@ -31,6 +31,6 @@ exe = executable(
   dependencies : dependencies,
   include_directories : inc_dirs,
   install : true,
-  c_args: ['-D_POSIX_C_SOURCE']
+  c_args: ['-D_POSIX_C_SOURCE=200809L']
 )
 

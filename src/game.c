@@ -17,8 +17,8 @@ uint16_t max_mine_cnt(uint16_t rows, uint16_t cols)
 
 static size_t rand_sz(size_t min, size_t max) // [min, max)
 {
-    size_t r = rand();
-    return min + (r % (max - min));
+    double r = rand() / ((double)RAND_MAX + 1);
+    return min + (size_t)(r * (double)(max - min));
 }
 
 static void shuffle_partial_sz(size_t n, size_t arr[static n], size_t lim)
