@@ -467,23 +467,23 @@ typedef struct {
 } args_t;
 
 #define EXE_NAME "mines"
-#define USAGE                                           \
-    "Usage: " EXE_NAME " [rows] [cols]              \n" \
-    "A simple TUI Minesweeper game made in C.       \n" \
-    "                                               \n" \
-    "Arguments:                                     \n" \
-    "  rows   Field height (defaults to 16)         \n" \
-    "  cols   Field width  (defaults to rows)       \n" \
-    "                                               \n" \
-    "Flags:                                         \n" \
-    "  -h, --help   show this help message          \n" \
-    "  -m, --mines  number of mines to place        \n" \
-    "               (default: 16%% of rows x cols)  \n" \
-    "                                               \n" \
-    "Examples:                                      \n" \
-    "  " EXE_NAME "           16x16 field           \n" \
-    "  " EXE_NAME " 10        10x10 field           \n" \
-    "  " EXE_NAME " 10 8      10x8 field            \n"
+#define USAGE                                             \
+    "Usage: " EXE_NAME " [options...] [rows] [cols]   \n" \
+    "A simple TUI Minesweeper game made in C.         \n" \
+    "                                                 \n" \
+    "Arguments:                                       \n" \
+    "  rows   Field height (defaults to 16)           \n" \
+    "  cols   Field width  (defaults to rows)         \n" \
+    "                                                 \n" \
+    "Flags:                                           \n" \
+    "  -h, --help   show this help message            \n" \
+    "  -m, --mines  number of mines to place          \n" \
+    "               (default: 16%% of rows x cols)    \n" \
+    "                                                 \n" \
+    "Examples:                                        \n" \
+    "  " EXE_NAME "           16 rows x 16 cols       \n" \
+    "  " EXE_NAME " 10        10 rows x 10 cols       \n" \
+    "  " EXE_NAME " 10 8      10 rows x 8 cols        \n"
 
 static constexpr uint16_t DEFAULT_ROWS = 16;
 static constexpr double DEFAULT_MINE_DENSITY = 0.16;
