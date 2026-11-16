@@ -37,7 +37,6 @@
               nativeBuildInputs = with pkgs; [
                 meson
                 ninja
-                pkg-config
               ];
 
               doCheck = true;
