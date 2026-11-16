@@ -2,6 +2,8 @@
 
 A simple TUI Minesweeper game made in C.
 
+![A screenshot of the game](.github/screenshot.png)
+
 ## Building
 
 > [!NOTE]
