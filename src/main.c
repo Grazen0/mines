@@ -36,8 +36,8 @@ typedef struct {
 static constexpr uint16_t CELL_WIDTH = 3;
 
 typedef struct {
-    size_t cur_i;
-    size_t cur_j;
+    uint16_t cur_i;
+    uint16_t cur_j;
     uint16_t win_rows;
     uint16_t win_cols;
     bool render_pending;
@@ -147,7 +147,7 @@ static bool print_centered(tui_t const tui[static 1], uint16_t row, bool forced,
 
         col = 0;
     } else {
-        col = (tui->win_cols - len) / 2;
+        col = (tui->win_cols - len + 1) / 2;
     }
 
     printf(SET_CURSOR, 1 + row, 1 + col);
@@ -187,6 +187,8 @@ static void render_status(game_t const game[static 1],
         if (!status)
             die("aprintf");
 
+        printf(SET_CURSOR, 1 + top - 2, 1);
+        printf(CLEAR_LINE);
         print_centered(tui, top - 2, false, status);
         free(status);
     }
@@ -247,6 +249,44 @@ static void show_exit_message()
     printf("goodbye!\n");
 }
 
+static void tui_move_cursor(tui_t tui[static 1], game_t const game[static 1],
+                            int16_t step_i, int16_t step_j, bool fast)
+{
+    assert(tui);
+
+    size_t pos = (tui->cur_i * game->cols) + tui->cur_j;
+    int32_t i_new = tui->cur_i + step_i;
+    int32_t j_new = tui->cur_j + step_j;
+    size_t pos_new = (i_new * game->cols) + j_new;
+
+    if (i_new < 0 || i_new >= game->rows || j_new < 0 || j_new >= game->cols)
+        return;
+
+    tui->cur_i = i_new;
+    tui->cur_j = j_new;
+    tui->render_pending = true;
+
+    // end move instantly if we moved across a wall border
+    if (!fast || game->revealed[pos] != game->revealed[pos_new])
+        return;
+
+    // otherwise, walk till we hit a wall border
+    while (true) {
+        i_new = tui->cur_i + step_i;
+        j_new = tui->cur_j + step_j;
+        if (i_new < 0 || i_new >= game->rows || j_new < 0 ||
+            j_new >= game->cols)
+            break;
+
+        size_t pos_new = (i_new * game->cols) + j_new;
+        if (game->revealed[pos] != game->revealed[pos_new])
+            break;
+
+        tui->cur_i = i_new;
+        tui->cur_j = j_new;
+    }
+}
+
 static void handle_key(game_t game[static 1], tui_t tui[static 1], char c)
 {
     assert(game);
@@ -256,26 +296,28 @@ static void handle_key(game_t game[static 1], tui_t tui[static 1], char c)
 
     switch (c) {
         case KEY_UP:
-            if (tui->cur_i == 0)
-                tui->cur_i = game->rows - 1;
-            else
-                --tui->cur_i;
-            tui->render_pending = true;
+            tui_move_cursor(tui, game, -1, 0, false);
             break;
         case KEY_DOWN:
-            tui->cur_i = (tui->cur_i + 1) % game->rows;
-            tui->render_pending = true;
+            tui_move_cursor(tui, game, 1, 0, false);
             break;
         case KEY_LEFT:
-            if (tui->cur_j == 0)
-                tui->cur_j = game->rows - 1;
-            else
-                --tui->cur_j;
-            tui->render_pending = true;
+            tui_move_cursor(tui, game, 0, -1, false);
             break;
         case KEY_RIGHT:
-            tui->cur_j = (tui->cur_j + 1) % game->cols;
-            tui->render_pending = true;
+            tui_move_cursor(tui, game, 0, 1, false);
+            break;
+        case KEY_UP_FAST:
+            tui_move_cursor(tui, game, -1, 0, true);
+            break;
+        case KEY_DOWN_FAST:
+            tui_move_cursor(tui, game, 1, 0, true);
+            break;
+        case KEY_LEFT_FAST:
+            tui_move_cursor(tui, game, 0, -1, true);
+            break;
+        case KEY_RIGHT_FAST:
+            tui_move_cursor(tui, game, 0, 1, true);
             break;
         case KEY_FLAG:
             if (game_toggle_flag(game, tui->cur_i, tui->cur_j))

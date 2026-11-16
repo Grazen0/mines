@@ -7,6 +7,7 @@
 #define CSI ESC "["
 #define SHOW_CURSOR CSI "?25h"
 #define HIDE_CURSOR CSI "?25l"
+#define CLEAR_LINE CSI "2K"
 #define CLEAR_ALL CSI "2J"
 #define SET_CURSOR CSI "%u;%uH"
 
