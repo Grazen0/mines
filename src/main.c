@@ -1,8 +1,11 @@
 #include "ansi.h"
+#include "color.h"
+#include "extra.h"
 #include "game.h"
 #include "input.h"
 #include <assert.h>
 #include <signal.h>
+#include <stdarg.h>
 #include <stdatomic.h>
 #include <stddef.h>
 #include <stdint.h>
@@ -14,10 +17,23 @@
 #include <time.h>
 #include <unistd.h>
 
+#define STATUS_TEXT "remaining: %d"
+#define GUIDE_TEXT_1 "move: hjkl  |  flag: f  |  reveal: ␣"
+#define GUIDE_TEXT_2 "use shift to move faster"
+#define WIN_TOO_SMALL_TEXT " window is too small! "
+#define WIN_SIZE_REQUIRED_TEXT " required: %u rows x %u cols "
+
+[[noreturn]] static void die(char const s[static 1])
+{
+    perror(s);
+    exit(EXIT_FAILURE);
+}
 typedef struct {
     uint16_t rows;
     uint16_t cols;
 } win_state_t;
+
+static constexpr uint16_t CELL_WIDTH = 3;
 
 typedef struct {
     size_t cur_i;
@@ -30,7 +46,8 @@ typedef struct {
 static void tui_update_win_size(tui_t tui[static 1])
 {
     assert(tui);
-    // update term size
+
+    // update win size
     struct winsize ws = {};
     ioctl(STDOUT_FILENO, TIOCGWINSZ, &ws);
     tui->win_rows = ws.ws_row;
@@ -45,14 +62,11 @@ static tui_t *tui_init(tui_t *tui, game_t const game[static 1])
         return nullptr;
 
     *tui = (tui_t){};
-    tui_update_win_size(tui);
     tui->cur_i = (game->rows - 1) / 2;
     tui->cur_j = (game->cols - 1) / 2;
     tui->render_pending = true;
     return tui;
 }
-
-static constexpr size_t CELL_WIDTH = 3;
 
 static constexpr color_t COLOR_BG = {28, 32, 36};
 static constexpr color_t COLOR_WALL = {39, 60, 66};
@@ -60,7 +74,6 @@ static constexpr color_t COLOR_FLAG = {247, 87, 87};
 static constexpr color_t COLOR_FLAG_BG = {84, 40, 50};
 static constexpr color_t COLOR_MINE = {30, 30, 30};
 static constexpr color_t COLOR_MINE_BG = {238, 102, 102};
-
 static constexpr color_t COLOR_CLUE[] = {
     { 56,  64,  72}, // .
     {124, 199, 255}, // 1
@@ -117,10 +130,96 @@ static void print_cell(game_t const game[static 1], size_t i, size_t j,
         fg = color_brighten(fg, 20);
     }
 
-    ansi_sgr(SGR_BOLD);
-    ansi_sgr_bg_rgb(bg);
-    ansi_sgr_fg_rgb(fg);
+    printf(SGR_BOLD SGR_BG_RGB SGR_FG_RGB, UNFOLD(bg), UNFOLD(fg));
     printf(" %c ", c);
+}
+
+static bool print_centered(tui_t const tui[static 1], uint16_t row, bool forced,
+                           char const s[static 1])
+{
+    assert(s);
+    size_t len = strlen(s);
+    uint16_t col = 0;
+
+    if (tui->win_cols < len) {
+        if (!forced)
+            return false;
+
+        col = 0;
+    } else {
+        col = (tui->win_cols - len) / 2;
+    }
+
+    printf(SET_CURSOR, 1 + row, 1 + col);
+    fputs(s, stdout);
+    return true;
+}
+
+static void render_win_size_message(game_t const game[static 1],
+                                    tui_t const tui[static 1])
+{
+    char *info =
+        aprintf(WIN_SIZE_REQUIRED_TEXT, game->rows, CELL_WIDTH * game->cols);
+    if (!info)
+        die("aprintf");
+
+    uint16_t mid = tui->win_rows / 2;
+
+    printf(SGR_BOLD SGR_BG_BRIGHT_RED SGR_FG_BLACK);
+    print_centered(tui, mid, true, WIN_TOO_SMALL_TEXT);
+    print_centered(tui, mid + 1, true, info);
+    printf(SGR_RESET);
+    fflush(stdout);
+
+    free(info);
+}
+
+static void render_status(game_t const game[static 1],
+                          tui_t const tui[static 1], uint16_t top)
+{
+    assert(game);
+    assert(tui);
+    printf(SGR_RESET);
+
+    if (top >= 2) {
+        int rem = (int)game->mine_cnt - (int)game->flag_cnt;
+        char *status = aprintf(STATUS_TEXT, rem);
+        if (!status)
+            die("aprintf");
+
+        print_centered(tui, top - 2, false, status);
+        free(status);
+    }
+}
+
+static void render_field(game_t const game[static 1], tui_t const tui[static 1],
+                         uint16_t top, uint16_t left)
+{
+    assert(game);
+    assert(tui);
+    printf(SGR_RESET);
+
+    for (uint16_t i = 0; i < game->rows; ++i) {
+        printf(SET_CURSOR, 1 + top + i, 1 + left);
+        for (size_t j = 0; j < game->cols; ++j) {
+            bool highlight = (i == tui->cur_i && j == tui->cur_j);
+            print_cell(game, i, j, highlight);
+        }
+    }
+}
+
+static void render_guide(game_t const game[static 1], tui_t const tui[static 1],
+                         uint16_t top)
+{
+
+    uint16_t guide_row = top + game->rows + 1;
+
+    if (guide_row < tui->win_rows) {
+        printf(SGR_RESET);
+        print_centered(tui, guide_row, false, GUIDE_TEXT_1);
+        if (guide_row + 2 < tui->win_rows)
+            print_centered(tui, guide_row + 2, false, GUIDE_TEXT_2);
+    }
 }
 
 static void render(game_t const game[static 1], tui_t const tui[static 1])
@@ -128,75 +227,25 @@ static void render(game_t const game[static 1], tui_t const tui[static 1])
     assert(game);
     assert(tui);
 
-    ansi_clear(CLEAR_ALL);
-    ansi_set_cursor(1, 1);
-
     if (tui->win_rows < game->rows || tui->win_cols < CELL_WIDTH * game->cols) {
-        printf("Window too small!\r\n");
-        fflush(stdout);
+        render_win_size_message(game, tui);
         return;
     }
 
-    size_t top_row = (tui->win_rows - game->rows) / 2;
-    size_t left_col = (tui->win_cols - CELL_WIDTH * game->cols) / 2;
+    uint16_t top = (tui->win_rows - game->rows) / 2;
+    uint16_t left = (tui->win_cols - CELL_WIDTH * game->cols) / 2;
 
-    assert(top_row + game->rows <= tui->win_rows);
-    assert(left_col + (CELL_WIDTH * game->cols) <= tui->win_cols);
-
-    if (top_row >= 2) {
-        ansi_set_cursor(1 + top_row - 2, 1 + left_col);
-        ansi_sgr(SGR_RESET);
-        printf(" Remaining: %2d ", (int)game->mine_cnt - (int)game->flag_cnt);
-    }
-
-    for (size_t i = 0; i < game->rows; ++i) {
-        ansi_set_cursor(1 + top_row + i, 1 + left_col);
-        for (size_t j = 0; j < game->cols; ++j) {
-            bool highlight = (i == tui->cur_i && j == tui->cur_j);
-            print_cell(game, i, j, highlight);
-        }
-    }
-
-    ansi_sgr(SGR_RESET);
+    render_status(game, tui, top);
+    render_field(game, tui, top, left);
+    render_guide(game, tui, top);
     fflush(stdout);
-}
-
-static volatile sig_atomic_t resize_pending;
-
-static void sigwinch_handler(int sig)
-{
-    assert(sig == SIGWINCH);
-    resize_pending = 1;
-}
-
-static void init_sigwinch_handler()
-{
-    struct sigaction act = {
-        .sa_handler = sigwinch_handler,
-        .sa_mask = {},
-        .sa_flags = 0,
-    };
-    sigemptyset(&act.sa_mask);
-    sigaction(SIGWINCH, &act, nullptr);
 }
 
 static void show_exit_message()
 {
-    ansi_sgr(SGR_RESET);
-    ansi_clear(CLEAR_ALL);
-    ansi_set_cursor(1, 1);
-    printf("Goodbye...\n");
+    printf(SGR_RESET CLEAR_ALL SET_CURSOR, 1, 1);
+    printf("goodbye!\n");
 }
-
-[[noreturn]] static void die(char const s[static 1])
-{
-    perror(s);
-    exit(EXIT_FAILURE);
-}
-
-typedef struct {
-    game_t game;
-} app_t;
 
 static void handle_key(game_t game[static 1], tui_t tui[static 1], char c)
 {
@@ -237,9 +286,31 @@ static void handle_key(game_t game[static 1], tui_t tui[static 1], char c)
             if (game_reveal(game, tui->cur_i, tui->cur_j))
                 tui->render_pending = true;
             break;
+        case KEY_RESET:
+            game_reset(game);
+            tui->render_pending = true;
+            break;
         default:
             break;
     }
+}
+
+static volatile sig_atomic_t resize_pending = 0;
+
+static void sigwinch_handler(int sig)
+{
+    assert(sig == SIGWINCH);
+    resize_pending = 1;
+}
+
+static void init_sigwinch_handler()
+{
+    struct sigaction act = {
+        .sa_handler = sigwinch_handler,
+        .sa_flags = 0,
+    };
+    sigemptyset(&act.sa_mask);
+    sigaction(SIGWINCH, &act, nullptr);
 }
 
 static void run(game_t game[static 1], tui_t tui[static 1])
@@ -247,9 +318,12 @@ static void run(game_t game[static 1], tui_t tui[static 1])
     assert(game);
     assert(tui);
 
+    resize_pending = 1;
+
     while (true) {
         if (resize_pending) {
             tui_update_win_size(tui);
+            printf(CLEAR_ALL);
             tui->render_pending = true;
             resize_pending = 0;
         }
@@ -273,6 +347,11 @@ static void run(game_t game[static 1], tui_t tui[static 1])
     }
 }
 
+static void show_cursor()
+{
+    printf(SHOW_CURSOR);
+}
+
 int main()
 {
     srand(time(nullptr));
@@ -282,22 +361,18 @@ int main()
     enter_raw_mode();
     atexit(exit_raw_mode);
 
-    ansi_hide_cursor();
-    atexit(ansi_show_cursor);
+    printf(HIDE_CURSOR);
+    atexit(show_cursor);
 
     init_sigwinch_handler();
 
     game_t game = {};
-    if (!game_init(&game, 15, 15, 25)) {
-        perror("game_init");
-        return EXIT_FAILURE;
-    }
+    if (!game_init(&game, 15, 15, 25))
+        die("game_init");
 
     tui_t tui = {};
-    if (!tui_init(&tui, &game)) {
-        perror("tui_init");
-        return EXIT_FAILURE;
-    }
+    if (!tui_init(&tui, &game))
+        die("tui_init");
 
     run(&game, &tui);
 

@@ -243,3 +243,16 @@ bool game_reveal(game_t game[static 1], size_t i, size_t j)
 
     return game_reveal_inner(game, i, j);
 }
+
+void game_reset(game_t game[static 1])
+{
+    assert(game);
+
+    memset(game->clue, 0, sizeof(*game->clue) * game->rows * game->cols);
+    memset(game->is_mine, 0, sizeof(*game->is_mine) * game->rows * game->cols);
+    memset(game->revealed, 0,
+           sizeof(*game->revealed) * game->rows * game->cols);
+    memset(game->flagged, 0, sizeof(*game->flagged) * game->rows * game->cols);
+    game->flag_cnt = 0;
+    game->state = STATE_BEGIN;
+}

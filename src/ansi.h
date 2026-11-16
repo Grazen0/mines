@@ -1,92 +1,49 @@
 #pragma once
-#include "color.h"
 #include <stddef.h>
 #include <stdint.h>
 #include <stdio.h>
 
 #define ESC "\033"
 #define CSI ESC "["
+#define SHOW_CURSOR CSI "?25h"
+#define HIDE_CURSOR CSI "?25l"
+#define CLEAR_ALL CSI "2J"
+#define SET_CURSOR CSI "%u;%uH"
 
-typedef enum : uint8_t {
-    CLEAR_TO_END = 0,
-    CLEAR_TO_BEGIN = 1,
-    CLEAR_ALL = 2,
-} ansi_clear_t;
-
-typedef enum : uint8_t {
-    SGR_RESET = 0,
-    SGR_BOLD = 1,
-    SGR_ITALIC = 3,
-    SGR_FG_BLACK = 30,
-    SGR_FG_RED = 31,
-    SGR_FG_GREEN = 32,
-    SGR_FG_YELLOW = 33,
-    SGR_FG_BLUE = 34,
-    SGR_FG_MAGENTA = 35,
-    SGR_FG_CYAN = 36,
-    SGR_FG_WHITE = 37,
-    SGR_FG_BRIGHT_BLACK = 90,
-    SGR_FG_BRIGHT_RED = 91,
-    SGR_FG_BRIGHT_GREEN = 92,
-    SGR_FG_BRIGHT_YELLOW = 93,
-    SGR_FG_BRIGHT_BLUE = 94,
-    SGR_FG_BRIGHT_MAGENTA = 95,
-    SGR_FG_BRIGHT_CYAN = 96,
-    SGR_FG_BRIGHT_WHITE = 97,
-    SGR_BG_BLACK = 40,
-    SGR_BG_RED = 41,
-    SGR_BG_GREEN = 42,
-    SGR_BG_YELLOW = 43,
-    SGR_BG_BLUE = 44,
-    SGR_BG_MAGENTA = 45,
-    SGR_BG_CYAN = 46,
-    SGR_BG_WHITE = 47,
-    SGR_BG_BRIGHT_BLACK = 100,
-    SGR_BG_BRIGHT_RED = 101,
-    SGR_BG_BRIGHT_GREEN = 102,
-    SGR_BG_BRIGHT_YELLOW = 103,
-    SGR_BG_BRIGHT_BLUE = 104,
-    SGR_BG_BRIGHT_MAGENTA = 105,
-    SGR_BG_BRIGHT_CYAN = 106,
-    SGR_BG_BRIGHT_WHITE = 107,
-} ansi_sgr_t;
-
-static inline void ansi_clear(ansi_clear_t clear)
-{
-    printf(CSI "%uJ", clear);
-}
-
-static inline void ansi_set_cursor(size_t row, size_t col)
-{
-    printf(CSI "%zu;%zuH", row, col);
-}
-
-static inline void ansi_show_cursor()
-{
-    printf(CSI "?25h");
-}
-
-static inline void ansi_hide_cursor()
-{
-    printf(CSI "?25l");
-}
-
-static inline void ansi_color_reset()
-{
-    printf(CSI "0m");
-}
-
-static inline void ansi_sgr(ansi_sgr_t sgr)
-{
-    printf(CSI "%um", sgr);
-}
-
-static inline void ansi_sgr_fg_rgb(color_t color)
-{
-    printf(CSI "38;2;%u;%u;%um", color.r, color.g, color.b);
-}
-
-static inline void ansi_sgr_bg_rgb(color_t color)
-{
-    printf(CSI "48;2;%u;%u;%um", color.r, color.g, color.b);
-}
+#define SGR_RESET CSI "0m"
+#define SGR_BOLD CSI "1m"
+#define SGR_ITALIC CSI "3m"
+#define SGR_FG_BLACK CSI "30m"
+#define SGR_FG_RED CSI "31m"
+#define SGR_FG_GREEN CSI "32m"
+#define SGR_FG_YELLOW CSI "33m"
+#define SGR_FG_BLUE CSI "34m"
+#define SGR_FG_MAGENTA CSI "35m"
+#define SGR_FG_CYAN CSI "36m"
+#define SGR_FG_WHITE CSI "37m"
+#define SGR_FG_BRIGHT_BLACK CSI "90m"
+#define SGR_FG_BRIGHT_RED CSI "91m"
+#define SGR_FG_BRIGHT_GREEN CSI "92m"
+#define SGR_FG_BRIGHT_YELLOW CSI "93m"
+#define SGR_FG_BRIGHT_BLUE CSI "94m"
+#define SGR_FG_BRIGHT_MAGENTA CSI "95m"
+#define SGR_FG_BRIGHT_CYAN CSI "96m"
+#define SGR_FG_BRIGHT_WHITE CSI "97m"
+#define SGR_BG_BLACK CSI "40m"
+#define SGR_BG_RED CSI "41m"
+#define SGR_BG_GREEN CSI "42m"
+#define SGR_BG_YELLOW CSI "43m"
+#define SGR_BG_BLUE CSI "44m"
+#define SGR_BG_MAGENTA CSI "45m"
+#define SGR_BG_CYAN CSI "46m"
+#define SGR_BG_WHITE CSI "47m"
+#define SGR_BG_BRIGHT_BLACK CSI "100m"
+#define SGR_BG_BRIGHT_RED CSI "101m"
+#define SGR_BG_BRIGHT_GREEN CSI "102m"
+#define SGR_BG_BRIGHT_YELLOW CSI "103m"
+#define SGR_BG_BRIGHT_BLUE CSI "104m"
+#define SGR_BG_BRIGHT_MAGENTA CSI "105m"
+#define SGR_BG_BRIGHT_CYAN CSI "106m"
+#define SGR_BG_BRIGHT_WHITE CSI "107m"
+#define SGR_FG_RGB CSI "38;2;%u;%u;%um"
+#define SGR_BG_RGB CSI "48;2;%u;%u;%um"

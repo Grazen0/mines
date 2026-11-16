@@ -16,6 +16,7 @@ typedef enum : char {
     KEY_FLAG = 'f',
     KEY_ENTER = 10, // return
     KEY_REVEAL = 32, // space
+    KEY_RESET = CTRL_KEY('r'),
 } key_t;
 
 // returns -1 on error

@@ -14,10 +14,10 @@ typedef struct {
     bool *is_mine; // rows x cols
     bool *revealed; // rows x cols
     bool *flagged; // rows x cols
-    size_t rows;
-    size_t cols;
     size_t mine_cnt;
     size_t flag_cnt;
+    uint16_t rows;
+    uint16_t cols;
     game_state_t state;
 } game_t;
 
@@ -28,3 +28,5 @@ void game_deinit(game_t *game);
 bool game_toggle_flag(game_t game[static 1], size_t i, size_t j);
 
 bool game_reveal(game_t game[static 1], size_t i, size_t j);
+
+void game_reset(game_t game[static 1]);
