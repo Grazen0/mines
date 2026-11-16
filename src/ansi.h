@@ -1,7 +1,5 @@
 #pragma once
 #include <stddef.h>
-#include <stdint.h>
-#include <stdio.h>
 
 #define ESC "\033"
 #define CSI ESC "["
@@ -10,6 +8,9 @@
 #define CLEAR_LINE CSI "2K"
 #define CLEAR_ALL CSI "2J"
 #define SET_CURSOR CSI "%u;%uH"
+
+#define ENABLE_ALT_BUFFER CSI "?1049h"
+#define DISABLE_ALT_BUFFER CSI "?1049l"
 
 #define SGR_RESET CSI "0m"
 #define SGR_BOLD CSI "1m"

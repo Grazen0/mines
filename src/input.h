@@ -14,8 +14,9 @@ typedef enum : char {
     KEY_UP_FAST = 'K',
     KEY_LEFT_FAST = 'H',
     KEY_FLAG = 'f',
-    KEY_ENTER = 10, // return
+    KEY_FLAG_ALT = 'F',
     KEY_REVEAL = 32, // space
+    KEY_REVEAL_ALT = 10, // return
     KEY_RESET = CTRL_KEY('r'),
 } key_t;
 

@@ -18,9 +18,11 @@
 #include <time.h>
 #include <unistd.h>
 
-#define STATUS_TEXT "remaining: %d"
-#define GUIDE_TEXT_1 "move: hjkl  |  flag: f  |  reveal: ␣"
-#define GUIDE_TEXT_2 "use shift to move faster"
+#define STATUS_TEXT " remaining: %d "
+#define GUIDE_TEXT_1 " move: hjkl/HJKL  |  flag: f  |  reveal: ␣ "
+#define GUIDE_TEXT_2 " reset: c-r  |  quit: c-q "
+#define LOSE_TEXT " you lose! "
+#define WIN_TEXT " you win! "
 #define WIN_TOO_SMALL_TEXT " window is too small! "
 #define WIN_SIZE_REQUIRED_TEXT " required: %u rows x %u cols "
 
@@ -75,6 +77,7 @@ static constexpr color_t COLOR_FLAG = {247, 87, 87};
 static constexpr color_t COLOR_FLAG_BG = {84, 40, 50};
 static constexpr color_t COLOR_MINE = {30, 30, 30};
 static constexpr color_t COLOR_MINE_BG = {238, 102, 102};
+static constexpr color_t COLOR_WIN_BG = {102, 194, 102};
 static constexpr color_t COLOR_CLUE[] = {
     { 56,  64,  72}, // .
     {124, 199, 255}, // 1
@@ -91,39 +94,75 @@ static constexpr color_t COLOR_CLUE[] = {
 static void print_cell(game_t const game[static 1], size_t i, size_t j,
                        bool highlight)
 {
+    typedef enum : uint8_t {
+        AS_WALL,
+        AS_MINE,
+        AS_FLAG,
+        AS_CLUE,
+    } draw_as_t;
+
     assert(game);
     assert(i < game->rows);
     assert(i < game->rows);
 
+    size_t pos = (i * game->cols) + j;
+    bool revealed = game->revealed[pos];
+    bool is_mine = game->is_mine[pos];
+    bool flagged = game->flagged[pos];
+    draw_as_t as = AS_WALL;
+
+    if (game->state == STATE_WIN) {
+        if (!revealed) {
+            assert(is_mine);
+            as = AS_FLAG;
+        } else {
+            as = AS_CLUE;
+        }
+    } else if (game->state == STATE_LOSE) {
+        if (is_mine)
+            as = AS_MINE;
+        else if (!revealed)
+            as = flagged ? AS_FLAG : AS_WALL;
+        else
+            as = AS_CLUE;
+    } else {
+        assert(game->state == STATE_PLAYING || game->state == STATE_BEGIN);
+        if (!revealed)
+            as = flagged ? AS_FLAG : AS_WALL;
+        else
+            as = AS_CLUE;
+    }
+
     color_t bg = {};
     color_t fg = {};
-    char c = ' ';
+    char c = 0;
 
-    size_t pos = (i * game->cols) + j;
-    if (!game->revealed[pos] && (!game->is_mine[pos] || game->flagged[pos] ||
-                                 game->state == STATE_PLAYING)) {
-        bg = COLOR_WALL;
-        fg = COLOR_FLAG;
-
-        if (game->flagged[pos]) {
+    switch (as) {
+        case AS_WALL:
+            bg = COLOR_WALL;
+            fg = COLOR_FLAG;
+            c = ' ';
+            break;
+        case AS_FLAG:
             bg = COLOR_FLAG_BG;
+            fg = COLOR_FLAG;
             c = 'F';
-        }
-    } else if (game->is_mine[pos]) {
-        bg = COLOR_MINE_BG;
-        fg = COLOR_MINE;
-        c = 'X';
-    } else {
-        uint8_t clue = game->clue[pos];
-        assert(clue <= 8);
+            break;
+        case AS_MINE:
+            bg = COLOR_MINE_BG;
+            fg = COLOR_MINE;
+            c = 'X';
+            break;
+        case AS_CLUE:
+            uint8_t clue = game->clue[pos];
+            assert(clue <= 8);
 
-        bg = COLOR_BG;
-        fg = COLOR_CLUE[clue];
-
-        if (clue == 0)
-            c = '.';
-        else
-            c = (char)('0' + clue);
+            bg = COLOR_BG;
+            fg = COLOR_CLUE[clue];
+            c = (char)(clue == 0 ? '.' : '0' + clue);
+            break;
+        default:
+            die("unreachable");
     }
 
     if (highlight) {
@@ -214,14 +253,27 @@ static void render_field(game_t const game[static 1], tui_t const tui[static 1],
 static void render_guide(game_t const game[static 1], tui_t const tui[static 1],
                          uint16_t top)
 {
-
+    printf(SGR_RESET);
     uint16_t guide_row = top + game->rows + 1;
 
     if (guide_row < tui->win_rows) {
+        printf(SET_CURSOR CLEAR_LINE, 1 + guide_row, 1);
+        if (game->state == STATE_WIN) {
+            printf(SGR_BG_RGB SGR_FG_RGB, UNFOLD(COLOR_WIN_BG),
+                   UNFOLD(COLOR_MINE));
+            print_centered(tui, guide_row, false, WIN_TEXT);
+        } else if (game->state == STATE_LOSE) {
+            printf(SGR_BG_RGB SGR_FG_RGB, UNFOLD(COLOR_MINE_BG),
+                   UNFOLD(COLOR_MINE));
+            print_centered(tui, guide_row, false, LOSE_TEXT);
+        } else {
+            print_centered(tui, guide_row, false, GUIDE_TEXT_1);
+        }
+    }
+
+    if (guide_row + 2 < tui->win_rows) {
         printf(SGR_RESET);
-        print_centered(tui, guide_row, false, GUIDE_TEXT_1);
-        if (guide_row + 2 < tui->win_rows)
-            print_centered(tui, guide_row + 2, false, GUIDE_TEXT_2);
+        print_centered(tui, guide_row + 2, false, GUIDE_TEXT_2);
     }
 }
 
@@ -242,12 +294,6 @@ static void render(game_t const game[static 1], tui_t const tui[static 1])
     render_field(game, tui, top, left);
     render_guide(game, tui, top);
     fflush(stdout);
-}
-
-static void show_exit_message()
-{
-    printf(SGR_RESET CLEAR_ALL SET_CURSOR, 1, 1);
-    printf("goodbye!\n");
 }
 
 static bool tui_move_cursor(tui_t tui[static 1], game_t const game[static 1],
@@ -296,6 +342,8 @@ static void handle_key(game_t game[static 1], tui_t tui[static 1], char c)
     assert(c);
     assert(c != -1);
 
+    bool playing = game->state == STATE_BEGIN || game->state == STATE_PLAYING;
+
     switch (c) {
         case KEY_UP:
             if (tui_move_cursor(tui, game, -1, 0, false))
@@ -330,12 +378,13 @@ static void handle_key(game_t game[static 1], tui_t tui[static 1], char c)
                 tui->render_pending = true;
             break;
         case KEY_FLAG:
-            if (game_toggle_flag(game, tui->cur_i, tui->cur_j))
+        case KEY_FLAG_ALT:
+            if (playing && game_toggle_flag(game, tui->cur_i, tui->cur_j))
                 tui->render_pending = true;
             break;
-        case KEY_ENTER:
         case KEY_REVEAL:
-            if (game_reveal(game, tui->cur_i, tui->cur_j))
+        case KEY_REVEAL_ALT:
+            if (playing && game_reveal(game, tui->cur_i, tui->cur_j))
                 tui->render_pending = true;
             break;
         case KEY_RESET:
@@ -399,17 +448,10 @@ static void run(game_t game[static 1], tui_t tui[static 1])
     }
 }
 
-static uint16_t max_mine_cnt(uint16_t rows, uint16_t cols)
+static void cleanup_term()
 {
-    if (rows * cols <= 9)
-        return 0;
-
-    return (rows * cols) - 9;
-}
-
-static void show_cursor()
-{
-    printf(SHOW_CURSOR);
+    printf(SHOW_CURSOR DISABLE_ALT_BUFFER SGR_RESET);
+    printf("goodbye!\n");
 }
 
 static const struct option long_options[] = {
@@ -451,6 +493,7 @@ static void parse_args(int argc, char *argv[static argc + 1], args_t *args)
     if (args)
         *args = (args_t){};
 
+    bool mines_set = false;
     args->rows = DEFAULT_ROWS;
 
     int opt = -1;
@@ -462,6 +505,7 @@ static void parse_args(int argc, char *argv[static argc + 1], args_t *args)
                 exit(EXIT_SUCCESS);
             case 'm':
                 args->mine_cnt = strtoul(optarg, nullptr, 10);
+                mines_set = true;
                 break;
             default:
                 fputs(USAGE, stderr);
@@ -480,7 +524,7 @@ static void parse_args(int argc, char *argv[static argc + 1], args_t *args)
 
     uint16_t max_mines = max_mine_cnt(args->rows, args->cols);
 
-    if (args->mine_cnt == 0) {
+    if (!mines_set) {
         uint16_t estimated =
             (uint16_t)(DEFAULT_MINE_DENSITY * args->rows * args->cols);
         args->mine_cnt = MIN(estimated, max_mines);
@@ -500,13 +544,11 @@ int main(int argc, char *argv[static argc + 1])
     args_t args = {};
     parse_args(argc, argv, &args);
 
-    atexit(show_exit_message);
+    printf(HIDE_CURSOR ENABLE_ALT_BUFFER);
+    atexit(cleanup_term);
 
     enter_raw_mode();
     atexit(exit_raw_mode);
-
-    printf(HIDE_CURSOR);
-    atexit(show_cursor);
 
     init_sigwinch_handler();
 

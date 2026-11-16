@@ -7,6 +7,14 @@
 #include <string.h>
 #include <unistd.h>
 
+uint16_t max_mine_cnt(uint16_t rows, uint16_t cols)
+{
+    if (rows * cols <= 9)
+        return 0;
+
+    return (rows * cols) - 9;
+}
+
 static size_t rand_sz(size_t min, size_t max) // [min, max)
 {
     size_t r = rand();
@@ -32,7 +40,7 @@ game_t *game_init(game_t *game, uint16_t rows, uint16_t cols, size_t mine_cnt)
     if (!game)
         return nullptr;
 
-    if (game->mine_cnt > game->rows * game->cols)
+    if (game->mine_cnt > max_mine_cnt(rows, cols))
         return nullptr;
 
     uint8_t *clue = calloc((size_t)rows * cols, sizeof(*clue));
@@ -206,11 +214,17 @@ static bool game_reveal_inner(game_t game[static 1], size_t i, size_t j)
         return false;
 
     game->revealed[pos] = true;
+    ++game->reveal_cnt;
 
-    if (game->is_mine[pos])
+    if (game->is_mine[pos]) {
         game->state = STATE_LOSE;
-    else if (game->clue[pos] == 0)
-        game_reveal_around(game, i, j);
+    } else {
+        assert(game->reveal_cnt + game->mine_cnt <= game->rows * game->cols);
+        if (game->reveal_cnt + game->mine_cnt == game->rows * game->cols)
+            game->state = STATE_WIN;
+        else if (game->clue[pos] == 0)
+            game_reveal_around(game, i, j);
+    }
 
     return true;
 }
@@ -259,5 +273,6 @@ void game_reset(game_t game[static 1])
            sizeof(*game->revealed) * game->rows * game->cols);
     memset(game->flagged, 0, sizeof(*game->flagged) * game->rows * game->cols);
     game->flag_cnt = 0;
+    game->reveal_cnt = 0;
     game->state = STATE_BEGIN;
 }
