@@ -94,75 +94,40 @@ static constexpr color_t COLOR_CLUE[] = {
 static void print_cell(game_t const game[static 1], size_t i, size_t j,
                        bool highlight)
 {
-    typedef enum : uint8_t {
-        AS_WALL,
-        AS_MINE,
-        AS_FLAG,
-        AS_CLUE,
-    } draw_as_t;
-
     assert(game);
     assert(i < game->rows);
     assert(i < game->rows);
 
     size_t pos = (i * game->cols) + j;
-    bool revealed = game->revealed[pos];
-    bool is_mine = game->is_mine[pos];
-    bool flagged = game->flagged[pos];
-    draw_as_t as = AS_WALL;
-
-    if (game->state == STATE_WIN) {
-        if (!revealed) {
-            assert(is_mine);
-            as = AS_FLAG;
-        } else {
-            as = AS_CLUE;
-        }
-    } else if (game->state == STATE_LOSE) {
-        if (is_mine)
-            as = AS_MINE;
-        else if (!revealed)
-            as = flagged ? AS_FLAG : AS_WALL;
-        else
-            as = AS_CLUE;
-    } else {
-        assert(game->state == STATE_PLAYING || game->state == STATE_BEGIN);
-        if (!revealed)
-            as = flagged ? AS_FLAG : AS_WALL;
-        else
-            as = AS_CLUE;
-    }
-
     color_t bg = {};
     color_t fg = {};
     char c = 0;
 
-    switch (as) {
-        case AS_WALL:
-            bg = COLOR_WALL;
-            fg = COLOR_FLAG;
-            c = ' ';
-            break;
-        case AS_FLAG:
+    if (game->state == STATE_LOSE && game->is_mine[pos]) {
+        // draw as mine
+        bg = COLOR_MINE_BG;
+        fg = COLOR_MINE;
+        c = 'X';
+    } else if (!game->revealed[pos]) {
+        if (game->flagged[pos]) {
+            // draw as flag
             bg = COLOR_FLAG_BG;
             fg = COLOR_FLAG;
             c = 'F';
-            break;
-        case AS_MINE:
-            bg = COLOR_MINE_BG;
-            fg = COLOR_MINE;
-            c = 'X';
-            break;
-        case AS_CLUE:
-            uint8_t clue = game->clue[pos];
-            assert(clue <= 8);
+        } else {
+            // draw as wall
+            bg = COLOR_WALL;
+            fg = COLOR_FLAG;
+            c = ' ';
+        }
+    } else {
+        // draw as clue
+        uint8_t clue = game->clue[pos];
+        assert(clue <= 8);
 
-            bg = COLOR_BG;
-            fg = COLOR_CLUE[clue];
-            c = (char)(clue == 0 ? '.' : '0' + clue);
-            break;
-        default:
-            die("unreachable");
+        bg = COLOR_BG;
+        fg = COLOR_CLUE[clue];
+        c = (char)(clue == 0 ? '.' : '0' + clue);
     }
 
     if (highlight) {

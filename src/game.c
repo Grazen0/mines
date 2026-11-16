@@ -184,6 +184,20 @@ static size_t count_flags_around(game_t const game[static 1], size_t i,
     return count;
 }
 
+static void game_win(game_t game[static 1])
+{
+    for (uint16_t pos = 0; pos < game->rows * game->cols; ++pos) {
+        if (game->is_mine[pos]) {
+            assert(!game->revealed[pos]);
+            game->flagged[pos] = true;
+        } else {
+            assert(game->revealed[pos]);
+        }
+    }
+
+    game->state = STATE_WIN;
+}
+
 static bool game_reveal_inner(game_t game[static 1], size_t i, size_t j);
 
 static void game_reveal_around(game_t game[static 1], size_t i, size_t j)
@@ -221,7 +235,7 @@ static bool game_reveal_inner(game_t game[static 1], size_t i, size_t j)
     } else {
         assert(game->reveal_cnt + game->mine_cnt <= game->rows * game->cols);
         if (game->reveal_cnt + game->mine_cnt == game->rows * game->cols)
-            game->state = STATE_WIN;
+            game_win(game);
         else if (game->clue[pos] == 0)
             game_reveal_around(game, i, j);
     }
