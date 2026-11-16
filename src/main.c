@@ -249,7 +249,7 @@ static void show_exit_message()
     printf("goodbye!\n");
 }
 
-static void tui_move_cursor(tui_t tui[static 1], game_t const game[static 1],
+static bool tui_move_cursor(tui_t tui[static 1], game_t const game[static 1],
                             int16_t step_i, int16_t step_j, bool fast)
 {
     assert(tui);
@@ -260,15 +260,14 @@ static void tui_move_cursor(tui_t tui[static 1], game_t const game[static 1],
     size_t pos_new = (i_new * game->cols) + j_new;
 
     if (i_new < 0 || i_new >= game->rows || j_new < 0 || j_new >= game->cols)
-        return;
+        return false;
 
     tui->cur_i = i_new;
     tui->cur_j = j_new;
-    tui->render_pending = true;
 
     // end move instantly if we moved across a wall border
     if (!fast || game->revealed[pos] != game->revealed[pos_new])
-        return;
+        return true;
 
     // otherwise, walk till we hit a wall border
     while (true) {
@@ -285,6 +284,8 @@ static void tui_move_cursor(tui_t tui[static 1], game_t const game[static 1],
         tui->cur_i = i_new;
         tui->cur_j = j_new;
     }
+
+    return true;
 }
 
 static void handle_key(game_t game[static 1], tui_t tui[static 1], char c)
@@ -296,28 +297,36 @@ static void handle_key(game_t game[static 1], tui_t tui[static 1], char c)
 
     switch (c) {
         case KEY_UP:
-            tui_move_cursor(tui, game, -1, 0, false);
+            if (tui_move_cursor(tui, game, -1, 0, false))
+                tui->render_pending = true;
             break;
         case KEY_DOWN:
-            tui_move_cursor(tui, game, 1, 0, false);
+            if (tui_move_cursor(tui, game, 1, 0, false))
+                tui->render_pending = true;
             break;
         case KEY_LEFT:
-            tui_move_cursor(tui, game, 0, -1, false);
+            if (tui_move_cursor(tui, game, 0, -1, false))
+                tui->render_pending = true;
             break;
         case KEY_RIGHT:
-            tui_move_cursor(tui, game, 0, 1, false);
+            if (tui_move_cursor(tui, game, 0, 1, false))
+                tui->render_pending = true;
             break;
         case KEY_UP_FAST:
-            tui_move_cursor(tui, game, -1, 0, true);
+            if (tui_move_cursor(tui, game, -1, 0, true))
+                tui->render_pending = true;
             break;
         case KEY_DOWN_FAST:
-            tui_move_cursor(tui, game, 1, 0, true);
+            if (tui_move_cursor(tui, game, 1, 0, true))
+                tui->render_pending = true;
             break;
         case KEY_LEFT_FAST:
-            tui_move_cursor(tui, game, 0, -1, true);
+            if (tui_move_cursor(tui, game, 0, -1, true))
+                tui->render_pending = true;
             break;
         case KEY_RIGHT_FAST:
-            tui_move_cursor(tui, game, 0, 1, true);
+            if (tui_move_cursor(tui, game, 0, 1, true))
+                tui->render_pending = true;
             break;
         case KEY_FLAG:
             if (game_toggle_flag(game, tui->cur_i, tui->cur_j))
