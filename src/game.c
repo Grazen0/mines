@@ -288,10 +288,7 @@ uint8_t game_count_neighbors_flagged(game_t const game[static 1], uint16_t i,
 
     for (int32_t di = -1; di <= 1; ++di) {
         for (int32_t dj = -1; dj <= 1; ++dj) {
-            if (di == 0 && dj == 0)
-                continue;
-
-            if (game_in_bounds(game, i + di, j + dj)) {
+            if ((di != 0 || dj != 0) && game_in_bounds(game, i + di, j + dj)) {
                 size_t npos = ((i + di) * game->cols) + j + dj;
                 count += game->flagged[npos];
             }
@@ -301,8 +298,8 @@ uint8_t game_count_neighbors_flagged(game_t const game[static 1], uint16_t i,
     return count;
 }
 
-uint8_t game_count_neighbors_unrevealed(game_t const game[static 1], uint16_t i,
-                                        uint16_t j)
+uint8_t game_count_neighbors_unknown(game_t const game[static 1], uint16_t i,
+                                     uint16_t j)
 {
     assert(game);
     assert(i < game->rows);
@@ -312,13 +309,9 @@ uint8_t game_count_neighbors_unrevealed(game_t const game[static 1], uint16_t i,
 
     for (int32_t di = -1; di <= 1; ++di) {
         for (int32_t dj = -1; dj <= 1; ++dj) {
-            if (di == 0 && dj == 0)
-                continue;
-
-            if (game_in_bounds(game, i + di, j + dj)) {
-                size_t npos = ((i + di) * game->cols) + j + dj;
-                count += !game->revealed[npos];
-            }
+            count +=
+                ((di != 0 || dj != 0) && game_in_bounds(game, i + di, j + dj) &&
+                 game_is_unknown(game, i + di, j + dj));
         }
     }
 

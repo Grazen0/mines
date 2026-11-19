@@ -36,9 +36,8 @@ bool game_reveal(game_t game[static 1], uint16_t i, uint16_t j);
 
 void game_reset(game_t game[static 1]);
 
-[[nodiscard]] uint8_t
-game_count_neighbors_unrevealed(game_t const game[static 1], uint16_t i,
-                                uint16_t j);
+[[nodiscard]] uint8_t game_count_neighbors_unknown(game_t const game[static 1],
+                                                   uint16_t i, uint16_t j);
 
 [[nodiscard]] uint8_t game_count_neighbors_flagged(game_t const game[static 1],
                                                    uint16_t i, uint16_t j);
@@ -48,4 +47,14 @@ game_count_neighbors_unrevealed(game_t const game[static 1], uint16_t i,
 {
     assert(game);
     return i >= 0 && i < game->rows && j >= 0 && j < game->cols;
+}
+
+[[nodiscard]] static inline bool game_is_unknown(game_t const game[static 1],
+                                                 uint16_t i, uint16_t j)
+{
+    assert(game);
+    assert(game_in_bounds(game, i, j));
+
+    size_t pos = (i * game->cols) + j;
+    return !game->revealed[pos] && !game->flagged[pos];
 }
