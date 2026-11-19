@@ -50,7 +50,7 @@ static constexpr color_t COLOR_CLUE[] = {
 
 #define STATUS_TEXT " remaining: %d "
 #define GUIDE_TEXT_1 " move: hjkl/HJKL  |  flag: f  |  reveal: ␣ "
-#define GUIDE_TEXT_2 " reset: c-r  |  quit: c-q "
+#define GUIDE_TEXT_2 " solve: c-s | reset: c-r  |  quit: c-q "
 #define LOSE_TEXT " you lose! "
 #define WIN_TEXT " you win! "
 #define WIN_ALERT_TEXT " window is too small! "
