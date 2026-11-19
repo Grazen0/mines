@@ -18,6 +18,7 @@ typedef enum : char {
     KEY_REVEAL = 32, // space
     KEY_REVEAL_ALT = 10, // return
     KEY_RESET = CTRL_KEY('r'),
+    KEY_SOLVE = CTRL_KEY('s'),
 } key_t;
 
 // returns -1 on error

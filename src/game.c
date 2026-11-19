@@ -94,7 +94,7 @@ void game_deinit(game_t *game)
     *game = (game_t){};
 }
 
-bool game_toggle_flag(game_t game[static 1], size_t i, size_t j)
+bool game_toggle_flag(game_t game[static 1], uint16_t i, uint16_t j)
 {
     assert(game);
     assert(i < game->rows);
@@ -119,15 +119,15 @@ static void game_calc_clues(game_t game[static 1])
 {
     memset(game->clue, 0, sizeof(*game->clue) * game->rows * game->cols);
 
-    for (size_t i = 0; i < game->rows; ++i) {
-        for (size_t j = 0; j < game->cols; ++j) {
+    for (uint16_t i = 0; i < game->rows; ++i) {
+        for (uint16_t j = 0; j < game->cols; ++j) {
             size_t pos = (i * game->cols) + j;
             if (!game->is_mine[pos])
                 continue;
 
-            for (int di = -1; di <= 1; ++di) {
-                for (int dj = -1; dj <= 1; ++dj) {
-                    if (i + di < game->rows && j + dj < game->cols) {
+            for (int32_t di = -1; di <= 1; ++di) {
+                for (int32_t dj = -1; dj <= 1; ++dj) {
+                    if (game_in_bounds(game, i + di, j + dj)) {
                         size_t npos = ((i + di) * game->cols) + j + dj;
                         ++game->clue[npos];
                     }
@@ -163,27 +163,6 @@ static void game_gen_mines(game_t game[static 1], size_t i_safe, size_t j_safe)
 
     game_calc_clues(game);
     free(candidates);
-}
-
-static size_t count_flags_around(game_t const game[static 1], size_t i,
-                                 size_t j)
-{
-    assert(game);
-    assert(i < game->rows);
-    assert(j < game->cols);
-
-    size_t count = 0;
-
-    for (int di = -1; di <= 1; ++di) {
-        for (int dj = -1; dj <= 1; ++dj) {
-            if (i + di < game->rows && j + dj < game->cols) {
-                size_t npos = ((i + di) * game->cols) + j + dj;
-                count += game->flagged[npos];
-            }
-        }
-    }
-
-    return count;
 }
 
 static void game_win(game_t game[static 1])
@@ -249,25 +228,26 @@ static bool game_reveal_inner(game_t game[static 1], size_t i, size_t j)
     return true;
 }
 
-bool game_reveal(game_t game[static 1], size_t i, size_t j)
+bool game_reveal(game_t game[static 1], uint16_t i, uint16_t j)
 {
     assert(game);
     assert(i < game->rows);
     assert(j < game->cols);
-    assert(game->state != STATE_WIN);
+    if (game->state == STATE_WIN || game->state == STATE_LOSE)
+        return false;
 
     size_t pos = (i * game->cols) + j;
     if (game->flagged[pos])
         return false;
 
     if (game->revealed[pos]) {
-        size_t flag_cnt = count_flags_around(game, i, j);
+        size_t flag_cnt = game_count_neighbors_flagged(game, i, j);
         if (flag_cnt != game->clue[pos])
             return false;
 
-        for (int di = -1; di <= 1; ++di) {
-            for (int dj = -1; dj <= 1; ++dj) {
-                if (i + di < game->rows && j + dj < game->cols)
+        for (int32_t di = -1; di <= 1; ++di) {
+            for (int32_t dj = -1; dj <= 1; ++dj) {
+                if (game_in_bounds(game, i + di, j + dj))
                     game_reveal_inner(game, i + di, j + dj);
             }
         }
@@ -295,4 +275,52 @@ void game_reset(game_t game[static 1])
     game->flag_cnt = 0;
     game->reveal_cnt = 0;
     game->state = STATE_BEGIN;
+}
+
+uint8_t game_count_neighbors_flagged(game_t const game[static 1], uint16_t i,
+                                     uint16_t j)
+{
+    assert(game);
+    assert(i < game->rows);
+    assert(j < game->cols);
+
+    uint8_t count = 0;
+
+    for (int32_t di = -1; di <= 1; ++di) {
+        for (int32_t dj = -1; dj <= 1; ++dj) {
+            if (di == 0 && dj == 0)
+                continue;
+
+            if (game_in_bounds(game, i + di, j + dj)) {
+                size_t npos = ((i + di) * game->cols) + j + dj;
+                count += game->flagged[npos];
+            }
+        }
+    }
+
+    return count;
+}
+
+uint8_t game_count_neighbors_unrevealed(game_t const game[static 1], uint16_t i,
+                                        uint16_t j)
+{
+    assert(game);
+    assert(i < game->rows);
+    assert(j < game->cols);
+
+    uint8_t count = 0;
+
+    for (int32_t di = -1; di <= 1; ++di) {
+        for (int32_t dj = -1; dj <= 1; ++dj) {
+            if (di == 0 && dj == 0)
+                continue;
+
+            if (game_in_bounds(game, i + di, j + dj)) {
+                size_t npos = ((i + di) * game->cols) + j + dj;
+                count += !game->revealed[npos];
+            }
+        }
+    }
+
+    return count;
 }

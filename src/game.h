@@ -1,4 +1,5 @@
 #pragma once
+#include <assert.h>
 #include <stddef.h>
 #include <stdint.h>
 
@@ -29,8 +30,22 @@ typedef struct {
 
 void game_deinit(game_t *game);
 
-bool game_toggle_flag(game_t game[static 1], size_t i, size_t j);
+bool game_toggle_flag(game_t game[static 1], uint16_t i, uint16_t j);
 
-bool game_reveal(game_t game[static 1], size_t i, size_t j);
+bool game_reveal(game_t game[static 1], uint16_t i, uint16_t j);
 
 void game_reset(game_t game[static 1]);
+
+[[nodiscard]] uint8_t
+game_count_neighbors_unrevealed(game_t const game[static 1], uint16_t i,
+                                uint16_t j);
+
+[[nodiscard]] uint8_t game_count_neighbors_flagged(game_t const game[static 1],
+                                                   uint16_t i, uint16_t j);
+
+[[nodiscard]] static inline bool game_in_bounds(game_t const game[static 1],
+                                                int32_t i, int32_t j)
+{
+    assert(game);
+    return i >= 0 && i < game->rows && j >= 0 && j < game->cols;
+}

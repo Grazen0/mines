@@ -2,6 +2,7 @@
 #include "ansi.h"
 #include "extra.h"
 #include "input.h"
+#include "solver.h"
 #include <assert.h>
 #include <signal.h>
 #include <stdint.h>
@@ -265,13 +266,6 @@ static void tui_render(tui_t const tui[static 1])
     fflush(stdout);
 }
 
-[[nodiscard]] static inline bool in_bounds(int32_t i, int32_t j,
-                                           game_t const game[static 1])
-{
-    assert(game);
-    return i >= 0 && i < game->rows && j >= 0 && j < game->cols;
-}
-
 static bool tui_move_cursor(tui_t tui[static 1], int16_t step_i, int16_t step_j,
                             bool fast)
 {
@@ -282,7 +276,7 @@ static bool tui_move_cursor(tui_t tui[static 1], int16_t step_i, int16_t step_j,
     int32_t j_new = tui->cur_j + step_j;
     size_t pos_new = (i_new * tui->game.cols) + j_new;
 
-    if (!in_bounds(i_new, j_new, &tui->game))
+    if (!game_in_bounds(&tui->game, i_new, j_new))
         return false;
 
     tui->cur_i = i_new;
@@ -298,7 +292,7 @@ static bool tui_move_cursor(tui_t tui[static 1], int16_t step_i, int16_t step_j,
         j_new = tui->cur_j + step_j;
         pos_new = (i_new * tui->game.cols) + j_new;
 
-        if (!in_bounds(i_new, j_new, &tui->game) ||
+        if (!game_in_bounds(&tui->game, i_new, j_new) ||
             tui->game.revealed[pos] != tui->game.revealed[pos_new])
             break;
 
@@ -359,6 +353,10 @@ static void tui_handle_key(tui_t tui[static 1], char c)
         case KEY_REVEAL:
         case KEY_REVEAL_ALT:
             if (playing && game_reveal(&tui->game, tui->cur_i, tui->cur_j))
+                tui->render_pending = true;
+            break;
+        case KEY_SOLVE:
+            if (playing && solver_step(&tui->game))
                 tui->render_pending = true;
             break;
         case KEY_RESET:

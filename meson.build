@@ -22,6 +22,7 @@ sources = [
   'src/game.c',
   'src/input.c',
   'src/main.c',
+  'src/solver.c',
   'src/tui.c',
 ]
 
