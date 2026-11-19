@@ -2,7 +2,7 @@
 #include <stddef.h>
 #include <stdint.h>
 
-uint16_t max_mine_cnt(uint16_t rows, uint16_t cols);
+[[nodiscard]] uint16_t max_mine_cnt(uint16_t rows, uint16_t cols);
 
 typedef enum : uint8_t {
     STATE_BEGIN,
@@ -24,7 +24,8 @@ typedef struct {
     game_state_t state;
 } game_t;
 
-game_t *game_init(game_t *game, uint16_t rows, uint16_t cols, size_t mine_cnt);
+[[nodiscard]] game_t *game_init(game_t *game, uint16_t rows, uint16_t cols,
+                                size_t mine_cnt);
 
 void game_deinit(game_t *game);
 
