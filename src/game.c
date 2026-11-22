@@ -4,7 +4,6 @@
 #include <errno.h>
 #include <stddef.h>
 #include <stdint.h>
-#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
@@ -87,8 +86,7 @@ game_t *game_init(game_t *game, arena_t *arena, uint16_t rows, uint16_t cols,
 bool game_toggle_flag(game_t game[static 1], uint16_t i, uint16_t j)
 {
     assert(game);
-    assert(i < game->rows);
-    assert(j < game->cols);
+    assert(game_in_bounds(game, i, j));
 
     auto revealed = GAME_UNFLAT(game, revealed);
     auto flagged = GAME_UNFLAT(game, flagged);
@@ -129,8 +127,7 @@ static void game_calc_clues(game_t game[static 1])
 static void game_gen_mines(game_t game[static 1], size_t i_safe, size_t j_safe)
 {
     assert(game);
-    assert(i_safe < game->rows);
-    assert(j_safe < game->cols);
+    assert(game_in_bounds(game, i_safe, j_safe));
     assert(game->state == STATE_BEGIN);
 
     size_t *candidates =
@@ -140,7 +137,10 @@ static void game_gen_mines(game_t game[static 1], size_t i_safe, size_t j_safe)
 
     for (size_t i = 0; i < game->rows; ++i) {
         for (size_t j = 0; j < game->cols; ++j) {
-            if (abs((int)i - (int)i_safe) > 1 || abs((int)j - (int)j_safe) > 1)
+            if (i == i_safe && j == j_safe)
+                continue;
+
+            if (!are_neighbors(i, j, i_safe, j_safe))
                 candidates[n_candidates++] = (i * game->cols) + j;
         }
     }
@@ -181,8 +181,7 @@ static bool game_reveal_inner(game_t game[static 1], uint16_t i, uint16_t j);
 static void game_reveal_around(game_t game[static 1], uint16_t i, uint16_t j)
 {
     assert(game);
-    assert(i < game->rows);
-    assert(j < game->cols);
+    assert(game_in_bounds(game, i, j));
 
     auto flagged = GAME_UNFLAT(game, flagged);
 
@@ -196,8 +195,7 @@ static void game_reveal_around(game_t game[static 1], uint16_t i, uint16_t j)
 static bool game_reveal_inner(game_t game[static 1], uint16_t i, uint16_t j)
 {
     assert(game);
-    assert(i < game->rows);
-    assert(j < game->cols);
+    assert(game_in_bounds(game, i, j));
 
     auto revealed = GAME_UNFLAT(game, revealed);
     auto flagged = GAME_UNFLAT(game, flagged);
@@ -227,8 +225,7 @@ static bool game_reveal_inner(game_t game[static 1], uint16_t i, uint16_t j)
 bool game_reveal(game_t game[static 1], uint16_t i, uint16_t j)
 {
     assert(game);
-    assert(i < game->rows);
-    assert(j < game->cols);
+    assert(game_in_bounds(game, i, j));
 
     auto revealed = GAME_UNFLAT(game, revealed);
     auto flagged = GAME_UNFLAT(game, flagged);
@@ -282,8 +279,7 @@ uint8_t game_count_neighbors_flagged(game_t const game[static 1], uint16_t i,
                                      uint16_t j)
 {
     assert(game);
-    assert(i < game->rows);
-    assert(j < game->cols);
+    assert(game_in_bounds(game, i, j));
 
     auto flagged = GAME_UNFLAT(game, flagged);
     uint8_t count = 0;
@@ -300,8 +296,7 @@ uint8_t game_count_neighbors_unknown(game_t const game[static 1], uint16_t i,
                                      uint16_t j)
 {
     assert(game);
-    assert(i < game->rows);
-    assert(j < game->cols);
+    assert(game_in_bounds(game, i, j));
 
     uint8_t count = 0;
 

@@ -12,13 +12,6 @@
 
 // solvers based on https://minesweeperblast.com/minesweeper-solver-algorithms/
 
-[[nodiscard]] static bool are_neighbors(uint16_t i1, uint16_t j1, uint16_t i2,
-                                        uint16_t j2)
-{
-    assert(i1 != i2 || j1 != j2);
-    return abs((int)i1 - i2) <= 1 && abs((int)j1 - j2) <= 1;
-}
-
 [[nodiscard]] static bool is_boundary_clue(game_t const game[static 1],
                                            uint16_t i, uint16_t j)
 {
@@ -255,6 +248,7 @@ static void csp_callback(void *ctx, size_t n, uint8_t const vals[static n])
 
     auto clue = GAME_UNFLAT(game, clue);
     auto revealed = GAME_UNFLAT(game, revealed);
+    auto flagged = GAME_UNFLAT(game, flagged);
 
     // this one formulates a CSP out of the known information
     // and attempts to solve it with csp.c
@@ -358,7 +352,8 @@ static void csp_callback(void *ctx, size_t n, uint8_t const vals[static n])
                 if (!revealed[i][j])
                     assert(game_reveal(game, i, j));
             } else if (res.vals[x] == VAL_MINE) {
-                assert(game_toggle_flag(game, i, j));
+                if (!flagged[i][j])
+                    assert(game_toggle_flag(game, i, j));
             }
         }
     }

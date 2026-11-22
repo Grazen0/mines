@@ -3,6 +3,7 @@
 #include <assert.h>
 #include <stddef.h>
 #include <stdint.h>
+#include <stdlib.h>
 
 static constexpr size_t MAX_NEIGHBORS = 8;
 
@@ -82,4 +83,11 @@ game_remaining_mines(game_t const game[static 1])
 {
     assert(game);
     return (int32_t)game->mine_cnt - game->flag_cnt;
+}
+
+[[nodiscard]] static inline bool are_neighbors(uint16_t i1, uint16_t j1,
+                                               uint16_t i2, uint16_t j2)
+{
+    assert(i1 != i2 || j1 != j2);
+    return abs((int)i1 - i2) <= 1 && abs((int)j1 - j2) <= 1;
 }

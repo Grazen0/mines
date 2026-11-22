@@ -23,15 +23,16 @@ typedef struct {
 
 #define UNFOLD(color) (color).r, (color).g, (color).b
 
-static color_t color_brighten(color_t color, uint8_t add)
+static inline color_t color_brighten(color_t color, uint8_t add)
 {
     return (color_t){
-        MIN(color.r + add, 255),
+        MIN(255, color.r + add),
         MIN(255, color.g + add),
         MIN(255, color.b + add),
     };
 }
 
+// Most colors were taken from https://minesweeper.online
 static constexpr color_t COLOR_BG = {28, 32, 36};
 static constexpr color_t COLOR_WALL = {39, 60, 66};
 static constexpr color_t COLOR_FLAG = {247, 87, 87};
@@ -52,7 +53,7 @@ static constexpr color_t COLOR_CLUE[] = {
 };
 
 #define STATUS_TEXT " remaining: %d "
-#define GUIDE_TEXT_1 " move: hjkl |  flag: f  |  reveal: ␣ "
+#define GUIDE_TEXT_1 " move: hjkl  |  flag: f  |  reveal: ␣ "
 #define GUIDE_TEXT_2 " solve: c-s | reset: c-r  |  quit: c-q "
 #define LOSE_TEXT " you lose! "
 #define WIN_TEXT " you win! "
@@ -119,8 +120,7 @@ static void tui_update_win_size(tui_t tui[static 1])
 static void print_cell(tui_t const tui[static 1], size_t i, size_t j)
 {
     assert(tui);
-    assert(i < tui->game.rows);
-    assert(j < tui->game.cols);
+    assert(game_in_bounds(&tui->game, i, j));
 
     auto revealed = GAME_UNFLAT(&tui->game, revealed);
     auto flagged = GAME_UNFLAT(&tui->game, flagged);
