@@ -62,34 +62,6 @@
     return retval;
 }
 
-[[nodiscard]] static bool solve_level_1(game_t game[static 1])
-{
-    assert(game);
-    bool retval = false;
-
-    for (uint16_t i = 0; i < game->rows; ++i) {
-        for (uint16_t j = 0; j < game->cols; ++j) {
-            if (!is_boundary_clue(game, i, j))
-                continue;
-
-            size_t pos = (i * game->cols) + j;
-            uint8_t covered = game_count_neighbors_unknown(game, i, j);
-            uint8_t flagged = game_count_neighbors_flagged(game, i, j);
-            uint8_t n = game->clue[pos];
-
-            // rule 1: all mines
-            if (covered + flagged == n)
-                retval = flag_all_neighbors(game, i, j) || retval;
-
-            // rule 2: all safe
-            if (flagged == n)
-                retval = game_reveal(game, i, j) || retval;
-        }
-    }
-
-    return retval;
-}
-
 /**
  * @brief Checks whether S(i_a, j_a) is a subset of S(i_b, j_b).
  */
@@ -157,7 +129,6 @@
     assert(game_in_bounds(game, i_a, j_a));
     assert(game_in_bounds(game, i_b, j_b));
     assert(is_subset_of(game, i_a, j_a, i_b, j_b));
-
     bool retval = false;
 
     for (int32_t di = -1; di <= 1; ++di) {
@@ -179,14 +150,46 @@
     return retval;
 }
 
-[[nodiscard]] static bool solve_level_2(game_t game[static 1])
+[[nodiscard]] static bool solve_level_1(game_t game[static 1])
 {
     assert(game);
     bool retval = false;
 
     // let S(A) be the set of unknown neighbors of A
-    // and m(A) be the number of mines around A.
+    // and m(A) be the number of mines left around A.
     //
+    // this one follows the simplest rules:
+    // - if m(A) = |S(A)|, then S(A) are all mines
+    // - if m(A) = 0, then S(A) are all safe
+
+    for (uint16_t i = 0; i < game->rows; ++i) {
+        for (uint16_t j = 0; j < game->cols; ++j) {
+            if (!is_boundary_clue(game, i, j))
+                continue;
+
+            size_t pos = (i * game->cols) + j;
+            uint8_t covered = game_count_neighbors_unknown(game, i, j);
+            uint8_t flagged = game_count_neighbors_flagged(game, i, j);
+            uint8_t n = game->clue[pos];
+
+            // rule 1: all mines
+            if (covered + flagged == n)
+                retval = flag_all_neighbors(game, i, j) || retval;
+
+            // rule 2: all safe
+            if (flagged == n)
+                retval = game_reveal(game, i, j) || retval;
+        }
+    }
+
+    return retval;
+}
+
+[[nodiscard]] static bool solve_level_2(game_t game[static 1])
+{
+    assert(game);
+    bool retval = false;
+
     // we look for pairs of boundary clues A, B
     // such that S(A) is a subset of S(B).
     // then, we deduce that S(B) - S(A) must contain m(B) - m(A) mines.
@@ -227,7 +230,7 @@
                     uint8_t n_a = game_count_neighbors_unknown(game, i_a, j_a);
                     uint8_t n_b = game_count_neighbors_unknown(game, i_b, j_b);
                     assert(n_a <= n_b);
-                    // assert(ma <= mb);
+                    assert(m_a <= m_b);
 
                     if (m_b == m_a) {
                         // all extra cells (S(B) - S(A)) are safe
@@ -246,8 +249,18 @@
     return retval;
 }
 
+[[nodiscard]] static bool solve_level_3(game_t game[static 1])
+{
+    assert(game);
+    bool retval = false;
+
+    // this one uses backtracking
+
+    return true;
+}
+
 bool solver_step(game_t game[static 1])
 {
     assert(game->state != STATE_LOSE);
-    return solve_level_1(game) || solve_level_2(game);
+    return solve_level_1(game) || solve_level_2(game) || solve_level_3(game);
 }

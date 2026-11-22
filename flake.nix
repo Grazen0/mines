@@ -37,6 +37,7 @@
               nativeBuildInputs = with pkgs; [
                 meson
                 ninja
+                ruby
               ];
 
               doCheck = true;
