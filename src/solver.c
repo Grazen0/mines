@@ -2,6 +2,7 @@
 #include "csp.h"
 #include "extra.h"
 #include "game.h"
+#include "memory.h"
 #include <assert.h>
 #include <stddef.h>
 #include <stdint.h>
@@ -15,7 +16,7 @@
                                         uint16_t j2)
 {
     assert(i1 != i2 || j1 != j2);
-    return abs(i1 - i2) <= 1 && abs(j1 - j2) <= 1;
+    return abs((int)i1 - i2) <= 1 && abs((int)j1 - j2) <= 1;
 }
 
 [[nodiscard]] static bool is_boundary_clue(game_t const game[static 1],
@@ -146,18 +147,17 @@
             if (!is_boundary_clue(game, i, j))
                 continue;
 
-            uint8_t covered = game_count_neighbors_unknown(game, i, j);
-            uint8_t flagged = game_count_neighbors_flagged(game, i, j);
-            uint8_t n = clue[i][j];
+            uint8_t unknown = game_count_neighbors_unknown(game, i, j);
+            uint8_t flags = game_count_neighbors_flagged(game, i, j);
 
             // rule 1: all mines
-            if (covered + flagged == n) {
+            if (unknown + flags == clue[i][j]) {
                 if (flag_all_neighbors(game, i, j))
                     progressed = true;
             }
 
             // rule 2: all safe
-            if (flagged == n) {
+            if (flags == clue[i][j]) {
                 if (game_reveal(game, i, j))
                     progressed = true;
             }
@@ -204,12 +204,12 @@
                 assert(n_a <= n_b);
                 assert(m_a <= m_b);
 
-                if (m_b == m_a) {
-                    // all extra cells (S(B) - S(A)) are safe
+                if (m_b - m_a == 0) {
+                    // all of S(B) - S(A) are safe
                     if (reveal_subset(game, i_a, j_a, i_b, j_b))
                         progressed = true;
-                } else if (m_b + n_a == n_b + m_a) {
-                    // all extra cells (S(B) - S(A)) are mines
+                } else if (m_b - m_a == n_b - n_a) {
+                    // all of S(B) - S(A) are mines
                     if (flag_subset(game, i_a, j_a, i_b, j_b))
                         progressed = true;
                 }
@@ -248,7 +248,7 @@ static void csp_callback(void *ctx, size_t n, uint8_t const vals[static n])
     }
 }
 
-[[nodiscard]] static bool solve_level_3(game_t game[static 1])
+[[nodiscard]] static bool solve_level_3(arena_t *arena, game_t game[static 1])
 {
     static constexpr uint16_t NIL = (uint16_t)-1;
     assert(game);
@@ -263,10 +263,9 @@ static void csp_callback(void *ctx, size_t n, uint8_t const vals[static n])
     if (rem <= 0)
         return false;
 
-    size_t (*cell_var)[game->cols] =
-        calloc((size_t)game->rows * game->cols, sizeof(**cell_var));
+    auto cell_var = MAKE_2D(arena, (size_t)game->rows, game->cols, size_t);
     if (!cell_var)
-        die("calloc");
+        die("MAKE_2D");
 
     for (uint16_t i = 0; i < game->rows; ++i)
         for (uint16_t j = 0; j < game->cols; ++j)
@@ -276,7 +275,7 @@ static void csp_callback(void *ctx, size_t n, uint8_t const vals[static n])
 
     for (uint16_t i = 0; i < game->rows; ++i) {
         for (uint16_t j = 0; j < game->cols; ++j) {
-            if (is_boundary_clue(game, i, j))
+            if (!is_boundary_clue(game, i, j))
                 continue;
 
             ITER_NEIGHBORS(game, i, j, ni, nj)
@@ -288,22 +287,20 @@ static void csp_callback(void *ctx, size_t n, uint8_t const vals[static n])
     }
 
     size_t n_vars = cur_var;
-
-    csp_t *csp = csp_create(n_vars);
+    csp_t *csp = csp_create(arena, n_vars);
 
     // We always consider the constraint
     // x_1 + x_2 + ... + x_n <= remaining mines.
     {
-        size_t *cons = calloc(n_vars, sizeof(*cons));
+        auto cons = MAKE(arena, n_vars, size_t);
         if (!cons)
-            die("calloc");
+            die("MAKE");
 
         for (size_t i = 0; i < n_vars; ++i)
             cons[i] = i;
 
-        if (!csp_add_constraint(csp, n_vars, cons, rem, REL_LEQ))
+        if (!csp_add_constraint(csp, arena, n_vars, cons, rem, REL_LEQ))
             die("csp_add_constraint");
-        free(cons);
     }
 
     for (uint16_t i = 0; i < game->rows; ++i) {
@@ -327,19 +324,21 @@ static void csp_callback(void *ctx, size_t n, uint8_t const vals[static n])
             }
 
             size_t rhs = clue[i][j] - flag_cnt;
-            if (!csp_add_constraint(csp, n, vars, rhs, REL_EQ))
+            if (!csp_add_constraint(csp, arena, n, vars, rhs, REL_EQ))
                 die("csp_add_constraint");
         }
     }
 
     csp_result_t res = {
         .solved = false,
-        .vals = calloc(n_vars, sizeof(*res.vals)),
+        .vals = MAKE(arena, n_vars, uint8_t),
     };
     if (!res.vals)
-        die("calloc");
+        die("MAKE");
 
-    if (!csp_solve(csp, &res, csp_callback))
+    memset(res.vals, 0, n_vars * sizeof(res.vals));
+
+    if (!csp_solve(csp, arena, &res, csp_callback))
         die("csp_solve");
 
     bool retval = true;
@@ -365,14 +364,13 @@ static void csp_callback(void *ctx, size_t n, uint8_t const vals[static n])
     }
 
 cleanup:
-    free(res.vals);
-    csp_destroy(csp);
-    free(cell_var);
     return retval;
 }
 
-bool solver_step(game_t game[static 1])
+bool solver_step(arena_t *arena, game_t game[static 1])
 {
+    assert(arena);
     assert(game->state != STATE_LOSE);
-    return solve_level_1(game) || solve_level_2(game) || solve_level_3(game);
+    return solve_level_1(game) || solve_level_2(game) ||
+           solve_level_3(arena, game);
 }

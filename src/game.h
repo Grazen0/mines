@@ -1,4 +1,5 @@
 #pragma once
+#include "memory.h"
 #include <assert.h>
 #include <stddef.h>
 #include <stdint.h>
@@ -42,10 +43,8 @@ typedef struct {
 #define ITER_NEIGHBORS(game, i, j, ni, nj) \
     ITER_NEIGHBORS_RADIUS(game, i, j, 1, ni, nj)
 
-[[nodiscard]] game_t *game_init(game_t *game, uint16_t rows, uint16_t cols,
-                                size_t mine_cnt);
-
-void game_deinit(game_t *game);
+[[nodiscard]] game_t *game_init(game_t *game, arena_t *arena, uint16_t rows,
+                                uint16_t cols, size_t mine_cnt);
 
 bool game_toggle_flag(game_t game[static 1], uint16_t i, uint16_t j);
 

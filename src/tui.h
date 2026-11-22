@@ -1,5 +1,6 @@
 #pragma once
 #include "game.h"
+#include "memory.h"
 #include <stdint.h>
 
 typedef struct {
@@ -9,6 +10,8 @@ typedef struct {
     uint16_t win_rows;
     uint16_t win_cols;
     bool render_pending;
+    arena_t *game_arena;
+    arena_t *solver_arena;
 } tui_t;
 
 [[nodiscard]] tui_t *tui_init(tui_t *tui, uint16_t rows, uint16_t cols,

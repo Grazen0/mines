@@ -1,5 +1,6 @@
 #pragma once
 
+#include "memory.h"
 #include <stddef.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -11,9 +12,7 @@ typedef enum : uint8_t {
 
 typedef struct csp_t csp_t;
 
-[[nodiscard]] csp_t *csp_create(size_t n_vars);
-
-void csp_destroy(csp_t *csp);
+[[nodiscard]] csp_t *csp_create(arena_t *arena, size_t n_vars);
 
 /**
  * @brief Adds a constraint to the CSP.
@@ -28,7 +27,7 @@ void csp_destroy(csp_t *csp);
  *
  * @return true on success, false on error.
  */
-[[nodiscard]] bool csp_add_constraint(csp_t *csp, size_t n,
+[[nodiscard]] bool csp_add_constraint(csp_t *csp, arena_t *arena, size_t n,
                                       size_t const vars[static n], size_t rhs,
                                       rel_t rel);
 
@@ -39,4 +38,5 @@ typedef void csp_callback_t(void *ctx, size_t n, uint8_t const vals[static n]);
  *
  * @return true on success, false on error.
  */
-[[nodiscard]] bool csp_solve(csp_t const *csp, void *ctx, csp_callback_t *cb);
+[[nodiscard]] bool csp_solve(csp_t const *csp, arena_t *arena, void *ctx,
+                             csp_callback_t *cb);

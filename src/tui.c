@@ -3,9 +3,11 @@
 #include "extra.h"
 #include "game.h"
 #include "input.h"
+#include "memory.h"
 #include "solver.h"
 #include <assert.h>
 #include <signal.h>
+#include <stddef.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -57,18 +59,39 @@ static constexpr color_t COLOR_CLUE[] = {
 #define WIN_ALERT_TEXT " window is too small! "
 #define WIN_ALERT_DETAILS_TEXT " required: %u rows x %u cols "
 
+static constexpr size_t GAME_ARENA_SIZE = 32ULL * 1024;
+static constexpr size_t SOLVER_ARENA_SIZE = 16ULL * 1024;
+
 tui_t *tui_init(tui_t *tui, uint16_t rows, uint16_t cols, size_t mine_cnt)
 {
     if (!tui)
         return nullptr;
 
-    *tui = (tui_t){};
-    if (!game_init(&tui->game, rows, cols, mine_cnt))
-        return nullptr;
+    arena_t *game_arena = arena_create(GAME_ARENA_SIZE);
+    if (!game_arena)
+        goto err_cleanup_1;
 
-    tui->cur_i = (rows - 1) / 2;
-    tui->cur_j = (cols - 1) / 2;
+    arena_t *solver_arena = arena_create(SOLVER_ARENA_SIZE);
+    if (!solver_arena)
+        goto err_cleanup_2;
+
+    *tui = (tui_t){
+        .cur_i = (rows - 1) / 2,
+        .cur_j = (cols - 1) / 2,
+        .game_arena = game_arena,
+        .solver_arena = solver_arena,
+    };
+    if (!game_init(&tui->game, tui->game_arena, rows, cols, mine_cnt))
+        goto err_cleanup_3;
+
     return tui;
+
+err_cleanup_3:
+    arena_destroy(solver_arena);
+err_cleanup_2:
+    arena_destroy(game_arena);
+err_cleanup_1:
+    return nullptr;
 }
 
 void tui_deinit(tui_t *tui)
@@ -76,7 +99,8 @@ void tui_deinit(tui_t *tui)
     if (!tui)
         return;
 
-    game_deinit(&tui->game);
+    arena_destroy(tui->solver_arena);
+    arena_destroy(tui->game_arena);
     *tui = (tui_t){};
 }
 
@@ -326,8 +350,10 @@ static void tui_handle_key(tui_t tui[static 1], char c)
                 tui->render_pending = true;
             break;
         case KEY_SOLVE:
-            if (playing && solver_step(&tui->game))
+            if (playing && solver_step(tui->solver_arena, &tui->game))
                 tui->render_pending = true;
+
+            arena_clear(tui->solver_arena);
             break;
         case KEY_RESET:
             game_reset(&tui->game);

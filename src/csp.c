@@ -1,4 +1,5 @@
 #include "csp.h"
+#include "memory.h"
 #include <assert.h>
 #include <errno.h>
 #include <stddef.h>
@@ -31,26 +32,11 @@ struct constraint_t {
     return cons;
 }
 
-[[nodiscard]] static constraint_t *cons_create(size_t n_vars, size_t rhs,
-                                               rel_t rel)
+[[nodiscard]] static constraint_t *cons_create(arena_t *arena, size_t n_vars,
+                                               size_t rhs, rel_t rel)
 {
-    return cons_init(malloc(sizeof(constraint_t)), n_vars, rhs, rel);
-}
-
-static void cons_destroy(constraint_t *cons);
-
-static void cons_deinit(constraint_t *cons)
-{
-    if (!cons)
-        return;
-
-    cons_destroy(cons->next);
-}
-
-static void cons_destroy(constraint_t *cons)
-{
-    cons_deinit(cons);
-    free(cons);
+    assert(arena);
+    return cons_init(MAKE(arena, 1, constraint_t), n_vars, rhs, rel);
 }
 
 static void cons_prepend(constraint_t **list, constraint_t *cons)
@@ -122,25 +108,11 @@ struct var_link_t {
     return link;
 }
 
-[[nodiscard]] static var_link_t *vlink_create(constraint_t *cons)
+[[nodiscard]] static var_link_t *vlink_create(arena_t *arena,
+                                              constraint_t *cons)
 {
-    return vlink_init(malloc(sizeof(var_link_t)), cons);
-}
-
-static void vlink_destroy(var_link_t *link);
-
-static void vlink_deinit(var_link_t *link)
-{
-    if (!link)
-        return;
-
-    vlink_destroy(link->next);
-}
-
-static void vlink_destroy(var_link_t *link)
-{
-    vlink_deinit(link);
-    free(link);
+    assert(arena);
+    return vlink_init(MAKE(arena, 1, var_link_t), cons);
 }
 
 static void vlink_prepend(var_link_t **list, var_link_t *link)
@@ -161,14 +133,16 @@ struct csp_t {
     var_link_t **var_links;
 };
 
-[[nodiscard]] static csp_t *csp_init(csp_t *csp, size_t n_vars)
+[[nodiscard]] static csp_t *csp_init(csp_t *csp, arena_t *arena, size_t n_vars)
 {
     if (!csp)
         return nullptr;
 
-    var_link_t **var_links = (var_link_t **)calloc(n_vars, sizeof(*var_links));
+    auto var_links = MAKE(arena, n_vars, var_link_t *);
     if (!var_links)
         return nullptr;
+
+    memset((void *)var_links, 0, n_vars * sizeof(*var_links));
 
     *csp = (csp_t){
         .constraints = nullptr,
@@ -179,33 +153,20 @@ struct csp_t {
     return csp;
 }
 
-csp_t *csp_create(size_t n_vars)
+csp_t *csp_create(arena_t *arena, size_t n_vars)
 {
-    return csp_init(malloc(sizeof(csp_t)), n_vars);
+    assert(arena);
+    return csp_init(MAKE(arena, 1, csp_t), arena, n_vars);
 }
 
-void csp_deinit(csp_t *csp)
+bool csp_add_constraint(csp_t *csp, arena_t *arena, size_t n,
+                        size_t const vars[static n], size_t rhs, rel_t rel)
 {
-    if (!csp)
-        return;
+    assert(csp);
+    assert(arena);
+    assert(vars);
 
-    for (size_t i = 0; i < csp->n_vars; ++i)
-        vlink_destroy(csp->var_links[i]);
-    free((void *)csp->var_links);
-    cons_destroy(csp->constraints);
-    *csp = (csp_t){};
-}
-
-void csp_destroy(csp_t *csp)
-{
-    csp_deinit(csp);
-    free(csp);
-}
-
-bool csp_add_constraint(csp_t *csp, size_t n, size_t const vars[static n],
-                        size_t rhs, rel_t rel)
-{
-    constraint_t *cons = cons_create(n, rhs, rel);
+    constraint_t *cons = cons_create(arena, n, rhs, rel);
     if (!cons)
         return false;
 
@@ -213,7 +174,7 @@ bool csp_add_constraint(csp_t *csp, size_t n, size_t const vars[static n],
 
     for (size_t i = 0; i < n; ++i) {
         assert(vars[i] < csp->n_vars);
-        var_link_t *link = vlink_create(cons);
+        var_link_t *link = vlink_create(arena, cons);
         vlink_prepend(&csp->var_links[vars[i]], link);
     }
 
@@ -229,19 +190,20 @@ typedef struct {
     csp_callback_t *cb;
 } solver_t;
 
-[[nodiscard]] static solver_t *solver_init(solver_t *solver, csp_t const *csp,
-                                           void *cb_ctx, csp_callback_t *cb)
+[[nodiscard]] static solver_t *solver_init(solver_t *solver, arena_t *arena,
+                                           csp_t const *csp, void *cb_ctx,
+                                           csp_callback_t *cb)
 {
     if (!solver) {
         return nullptr;
     }
 
-    if (!csp) {
+    if (!arena || !csp) {
         errno = EINVAL;
         return nullptr;
     }
 
-    uint8_t *vals = calloc(csp->n_vars, sizeof(*vals));
+    auto vals = MAKE(arena, csp->n_vars, uint8_t);
     if (!vals)
         return nullptr;
 
@@ -256,14 +218,6 @@ typedef struct {
     };
 
     return solver;
-}
-
-static void solver_deinit(solver_t *solver)
-{
-    if (!solver)
-        return;
-
-    free(solver->vals);
 }
 
 [[nodiscard]] static bool solver_allows_value(solver_t const solver[static 1],
@@ -331,16 +285,16 @@ static void solver_backtrack(solver_t solver[static 1], size_t x)
     }
 }
 
-bool csp_solve(csp_t const *csp, void *ctx, csp_callback_t *cb)
+bool csp_solve(csp_t const *csp, arena_t *arena, void *ctx, csp_callback_t *cb)
 {
     assert(csp);
+    assert(arena);
     assert(cb);
 
     solver_t solver = {};
-    if (!solver_init(&solver, csp, ctx, cb))
+    if (!solver_init(&solver, arena, csp, ctx, cb))
         return false;
 
     solver_backtrack(&solver, 0);
-    solver_deinit(&solver);
     return true;
 }

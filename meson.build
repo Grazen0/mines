@@ -30,6 +30,7 @@ core_lib = library(
   'src/csp.c',
   'src/game.c',
   'src/solver.c',
+  'src/memory.c',
   include_directories : inc_dirs,
   install : false,
 
@@ -59,6 +60,7 @@ exe = executable(
 
 tests = [
   'csp_test',
+  'memory_test',
 ]
 
 unity_proj = subproject('unity')

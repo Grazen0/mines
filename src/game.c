@@ -1,5 +1,7 @@
 #include "game.h"
+#include "memory.h"
 #include <assert.h>
+#include <errno.h>
 #include <stddef.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -37,61 +39,49 @@ static void shuffle_partial_sz(size_t n, size_t arr[static n], size_t lim)
     }
 }
 
-game_t *game_init(game_t *game, uint16_t rows, uint16_t cols, size_t mine_cnt)
+game_t *game_init(game_t *game, arena_t *arena, uint16_t rows, uint16_t cols,
+                  size_t mine_cnt)
 {
     if (!game)
         return nullptr;
 
-    if (game->mine_cnt > max_mine_cnt(rows, cols))
+    if (!arena || game->mine_cnt > max_mine_cnt(rows, cols)) {
+        errno = EINVAL;
         return nullptr;
+    }
 
-    uint8_t *clue = calloc((size_t)rows * cols, sizeof(*clue));
+    auto clue = MAKE(arena, (size_t)rows * cols, uint8_t);
     if (!clue)
-        goto err_cleanup_1;
+        return nullptr;
 
-    bool *is_mine = calloc((size_t)rows * cols, sizeof(*is_mine));
+    auto is_mine = MAKE(arena, (size_t)rows * cols, bool);
     if (!is_mine)
-        goto err_cleanup_2;
+        return nullptr;
 
-    bool *revealed = calloc((size_t)rows * cols, sizeof(*revealed));
+    auto revealed = MAKE(arena, (size_t)rows * cols, bool);
     if (!revealed)
-        goto err_cleanup_3;
+        return nullptr;
 
-    bool *flagged = calloc((size_t)rows * cols, sizeof(*flagged));
+    auto flagged = MAKE(arena, (size_t)rows * cols, bool);
     if (!flagged)
-        goto err_cleanup_4;
+        return nullptr;
 
-    *game = (game_t){};
-    game->rows = rows;
-    game->cols = cols;
-    game->mine_cnt = mine_cnt;
-    game->clue = clue;
-    game->is_mine = is_mine;
-    game->revealed = revealed;
-    game->flagged = flagged;
-    game->state = STATE_BEGIN;
+    memset(clue, 0, (size_t)rows * cols * sizeof(*clue));
+    memset(is_mine, 0, (size_t)rows * cols * sizeof(*is_mine));
+    memset(revealed, 0, (size_t)rows * cols * sizeof(*revealed));
+    memset(flagged, 0, (size_t)rows * cols * sizeof(*flagged));
+
+    *game = (game_t){
+        .rows = rows,
+        .cols = cols,
+        .mine_cnt = mine_cnt,
+        .clue = clue,
+        .is_mine = is_mine,
+        .revealed = revealed,
+        .flagged = flagged,
+        .state = STATE_BEGIN,
+    };
     return game;
-
-err_cleanup_4:
-    free(revealed);
-err_cleanup_3:
-    free(is_mine);
-err_cleanup_2:
-    free(clue);
-err_cleanup_1:
-    return nullptr;
-}
-
-void game_deinit(game_t *game)
-{
-    if (!game)
-        return;
-
-    free(game->flagged);
-    free(game->revealed);
-    free(game->is_mine);
-    free(game->clue);
-    *game = (game_t){};
 }
 
 bool game_toggle_flag(game_t game[static 1], uint16_t i, uint16_t j)
