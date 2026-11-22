@@ -100,16 +100,18 @@ bool game_toggle_flag(game_t game[static 1], uint16_t i, uint16_t j)
     assert(i < game->rows);
     assert(j < game->cols);
 
-    size_t pos = (i * game->cols) + j;
-    if (game->revealed[pos])
+    auto revealed = GAME_UNFLAT(game, revealed);
+    auto flagged = GAME_UNFLAT(game, flagged);
+
+    if (revealed[i][j])
         return false;
 
-    if (game->flagged[pos]) {
+    if (flagged[i][j]) {
         assert(game->flag_cnt > 0);
-        game->flagged[pos] = false;
+        flagged[i][j] = false;
         --game->flag_cnt;
     } else {
-        game->flagged[pos] = true;
+        flagged[i][j] = true;
         ++game->flag_cnt;
     }
     return true;
@@ -119,18 +121,15 @@ static void game_calc_clues(game_t game[static 1])
 {
     memset(game->clue, 0, sizeof(*game->clue) * game->rows * game->cols);
 
+    auto is_mine = GAME_UNFLAT(game, is_mine);
+    auto clue = GAME_UNFLAT(game, clue);
+
     for (uint16_t i = 0; i < game->rows; ++i) {
         for (uint16_t j = 0; j < game->cols; ++j) {
-            size_t pos = (i * game->cols) + j;
-            if (!game->is_mine[pos])
-                continue;
-
-            for (int32_t di = -1; di <= 1; ++di) {
-                for (int32_t dj = -1; dj <= 1; ++dj) {
-                    if (game_in_bounds(game, i + di, j + dj)) {
-                        size_t npos = ((i + di) * game->cols) + j + dj;
-                        ++game->clue[npos];
-                    }
+            if (is_mine[i][j]) {
+                ITER_NEIGHBORS(game, i, j, ni, nj)
+                {
+                    ++clue[ni][nj];
                 }
             }
         }
@@ -167,15 +166,19 @@ static void game_gen_mines(game_t game[static 1], size_t i_safe, size_t j_safe)
 
 static void game_win(game_t game[static 1])
 {
+    assert(game);
+
+    auto revealed = GAME_UNFLAT(game, revealed);
+    auto is_mine = GAME_UNFLAT(game, is_mine);
+    auto flagged = GAME_UNFLAT(game, flagged);
+
     for (uint16_t i = 0; i < game->rows; ++i) {
         for (uint16_t j = 0; j < game->cols; ++j) {
-            size_t pos = (i * game->cols) + j;
-
-            if (game->is_mine[pos]) {
-                if (!game->flagged[pos])
+            if (is_mine[i][j]) {
+                if (!flagged[i][j])
                     assert(game_toggle_flag(game, i, j));
             } else {
-                assert(game->revealed[pos]);
+                assert(revealed[i][j]);
             }
         }
     }
@@ -183,45 +186,48 @@ static void game_win(game_t game[static 1])
     game->state = STATE_WIN;
 }
 
-static bool game_reveal_inner(game_t game[static 1], size_t i, size_t j);
+static bool game_reveal_inner(game_t game[static 1], uint16_t i, uint16_t j);
 
-static void game_reveal_around(game_t game[static 1], size_t i, size_t j)
+static void game_reveal_around(game_t game[static 1], uint16_t i, uint16_t j)
 {
     assert(game);
     assert(i < game->rows);
     assert(j < game->cols);
 
-    for (int di = -1; di <= 1; ++di) {
-        for (int dj = -1; dj <= 1; ++dj) {
-            if (i + di < game->rows && j + dj < game->cols) {
-                size_t npos = ((i + di) * game->cols) + j + dj;
-                if (!game->is_mine[npos])
-                    game_reveal_inner(game, i + di, j + dj);
-            }
-        }
+    auto flagged = GAME_UNFLAT(game, flagged);
+
+    ITER_NEIGHBORS(game, i, j, ni, nj)
+    {
+        if (!flagged[ni][nj])
+            game_reveal_inner(game, ni, nj);
     }
 }
 
-static bool game_reveal_inner(game_t game[static 1], size_t i, size_t j)
+static bool game_reveal_inner(game_t game[static 1], uint16_t i, uint16_t j)
 {
     assert(game);
     assert(i < game->rows);
     assert(j < game->cols);
 
-    size_t pos = (i * game->cols) + j;
-    if (game->revealed[pos] || game->flagged[pos])
+    auto revealed = GAME_UNFLAT(game, revealed);
+    auto flagged = GAME_UNFLAT(game, flagged);
+    auto is_mine = GAME_UNFLAT(game, is_mine);
+    auto clue = GAME_UNFLAT(game, clue);
+
+    if (revealed[i][j] || flagged[i][j])
         return false;
 
-    game->revealed[pos] = true;
+    revealed[i][j] = true;
     ++game->reveal_cnt;
 
-    if (game->is_mine[pos]) {
+    if (is_mine[i][j]) {
         game->state = STATE_LOSE;
     } else {
         assert(game->reveal_cnt + game->mine_cnt <= game->rows * game->cols);
+
         if (game->reveal_cnt + game->mine_cnt == game->rows * game->cols)
             game_win(game);
-        else if (game->clue[pos] == 0)
+        else if (clue[i][j] == 0)
             game_reveal_around(game, i, j);
     }
 
@@ -233,30 +239,35 @@ bool game_reveal(game_t game[static 1], uint16_t i, uint16_t j)
     assert(game);
     assert(i < game->rows);
     assert(j < game->cols);
+
+    auto revealed = GAME_UNFLAT(game, revealed);
+    auto flagged = GAME_UNFLAT(game, flagged);
+    auto is_mine = GAME_UNFLAT(game, is_mine);
+    auto clue = GAME_UNFLAT(game, clue);
+
     if (game->state == STATE_WIN || game->state == STATE_LOSE)
         return false;
 
-    size_t pos = (i * game->cols) + j;
-    if (game->flagged[pos])
+    if (flagged[i][j])
         return false;
 
-    if (game->revealed[pos]) {
+    if (revealed[i][j]) {
+        // auto-reveal around completed clues
         size_t flag_cnt = game_count_neighbors_flagged(game, i, j);
-        if (flag_cnt != game->clue[pos])
+        if (flag_cnt != clue[i][j])
             return false;
 
-        for (int32_t di = -1; di <= 1; ++di) {
-            for (int32_t dj = -1; dj <= 1; ++dj) {
-                if (game_in_bounds(game, i + di, j + dj))
-                    game_reveal_inner(game, i + di, j + dj);
-            }
+        ITER_NEIGHBORS(game, i, j, ni, nj)
+        {
+            if (game_in_bounds(game, ni, nj))
+                game_reveal_inner(game, ni, nj);
         }
         return true;
     }
 
     if (game->state == STATE_BEGIN) {
         game_gen_mines(game, i, j);
-        assert(!game->is_mine[(i * game->cols) + j]);
+        assert(!is_mine[i][j]);
         game->state = STATE_PLAYING;
     }
 
@@ -284,15 +295,12 @@ uint8_t game_count_neighbors_flagged(game_t const game[static 1], uint16_t i,
     assert(i < game->rows);
     assert(j < game->cols);
 
+    auto flagged = GAME_UNFLAT(game, flagged);
     uint8_t count = 0;
 
-    for (int32_t di = -1; di <= 1; ++di) {
-        for (int32_t dj = -1; dj <= 1; ++dj) {
-            if ((di != 0 || dj != 0) && game_in_bounds(game, i + di, j + dj)) {
-                size_t npos = ((i + di) * game->cols) + j + dj;
-                count += game->flagged[npos];
-            }
-        }
+    ITER_NEIGHBORS(game, i, j, ni, nj)
+    {
+        count += flagged[ni][nj];
     }
 
     return count;
@@ -307,12 +315,9 @@ uint8_t game_count_neighbors_unknown(game_t const game[static 1], uint16_t i,
 
     uint8_t count = 0;
 
-    for (int32_t di = -1; di <= 1; ++di) {
-        for (int32_t dj = -1; dj <= 1; ++dj) {
-            count +=
-                ((di != 0 || dj != 0) && game_in_bounds(game, i + di, j + dj) &&
-                 game_is_unknown(game, i + di, j + dj));
-        }
+    ITER_NEIGHBORS(game, i, j, ni, nj)
+    {
+        count += game_is_unknown(game, ni, nj);
     }
 
     return count;

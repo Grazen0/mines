@@ -22,10 +22,6 @@ void csp_destroy(csp_t *csp);
  *
  *   vars[0] + vars[1] + ... + vars[n-1] = rhs
  *
- * The following rules must be obeyed:
- * - `vars` must NOT contain duplicate variable numbers.
- * - `vars` must contain valid variable numbers for `csp`.
- *
  * @param csp the CSP to add the constraint to
  * @param n length of vars
  * @param vars variables in the left-hand side

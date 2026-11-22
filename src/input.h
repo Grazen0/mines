@@ -9,10 +9,6 @@ typedef enum : char {
     KEY_RIGHT = 'l',
     KEY_UP = 'k',
     KEY_LEFT = 'h',
-    KEY_DOWN_FAST = 'J',
-    KEY_RIGHT_FAST = 'L',
-    KEY_UP_FAST = 'K',
-    KEY_LEFT_FAST = 'H',
     KEY_FLAG = 'f',
     KEY_FLAG_ALT = 'F',
     KEY_REVEAL = 32, // space

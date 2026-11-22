@@ -50,7 +50,7 @@ static constexpr color_t COLOR_CLUE[] = {
 };
 
 #define STATUS_TEXT " remaining: %d "
-#define GUIDE_TEXT_1 " move: hjkl/HJKL  |  flag: f  |  reveal: ␣ "
+#define GUIDE_TEXT_1 " move: hjkl |  flag: f  |  reveal: ␣ "
 #define GUIDE_TEXT_2 " solve: c-s | reset: c-r  |  quit: c-q "
 #define LOSE_TEXT " you lose! "
 #define WIN_TEXT " you win! "
@@ -98,18 +98,22 @@ static void print_cell(tui_t const tui[static 1], size_t i, size_t j)
     assert(i < tui->game.rows);
     assert(j < tui->game.cols);
 
-    size_t pos = (i * tui->game.cols) + j;
+    auto revealed = GAME_UNFLAT(&tui->game, revealed);
+    auto flagged = GAME_UNFLAT(&tui->game, flagged);
+    auto is_mine = GAME_UNFLAT(&tui->game, is_mine);
+    auto clue = GAME_UNFLAT(&tui->game, clue);
+
     color_t bg = {};
     color_t fg = {};
     char c = 0;
 
-    if (tui->game.state == STATE_LOSE && tui->game.is_mine[pos]) {
+    if (tui->game.state == STATE_LOSE && is_mine[i][j]) {
         // draw as mine
         bg = COLOR_MINE_BG;
         fg = COLOR_MINE;
         c = 'X';
-    } else if (!tui->game.revealed[pos]) {
-        if (tui->game.flagged[pos]) {
+    } else if (!revealed[i][j]) {
+        if (flagged[i][j]) {
             // draw as flag
             bg = COLOR_FLAG_BG;
             fg = COLOR_FLAG;
@@ -122,12 +126,13 @@ static void print_cell(tui_t const tui[static 1], size_t i, size_t j)
         }
     } else {
         // draw as clue
-        uint8_t clue = tui->game.clue[pos];
-        assert(clue <= 8);
+        assert(clue[i][j] <= 8);
 
         bg = COLOR_BG;
-        fg = COLOR_CLUE[clue];
-        c = (char)(clue == 0 ? '.' : '0' + clue);
+        fg = COLOR_CLUE[clue[i][j]];
+        c = (char)('0' + clue[i][j]);
+        if (c == '0')
+            c = '.';
     }
 
     if (i == tui->cur_i && j == tui->cur_j) {
@@ -266,40 +271,18 @@ static void tui_render(tui_t const tui[static 1])
     fflush(stdout);
 }
 
-static bool tui_move_cursor(tui_t tui[static 1], int16_t step_i, int16_t step_j,
-                            bool fast)
+static bool tui_move_cursor(tui_t tui[static 1], int16_t step_i, int16_t step_j)
 {
     assert(tui);
 
-    size_t pos = (tui->cur_i * tui->game.cols) + tui->cur_j;
     int32_t i_new = tui->cur_i + step_i;
     int32_t j_new = tui->cur_j + step_j;
-    size_t pos_new = (i_new * tui->game.cols) + j_new;
 
     if (!game_in_bounds(&tui->game, i_new, j_new))
         return false;
 
     tui->cur_i = i_new;
     tui->cur_j = j_new;
-
-    // if we're moving fast, end instantly if we moved across a wall border
-    if (!fast || tui->game.revealed[pos] != tui->game.revealed[pos_new])
-        return true;
-
-    // otherwise, walk till we hit a wall border
-    while (true) {
-        i_new = tui->cur_i + step_i;
-        j_new = tui->cur_j + step_j;
-        pos_new = (i_new * tui->game.cols) + j_new;
-
-        if (!game_in_bounds(&tui->game, i_new, j_new) ||
-            tui->game.revealed[pos] != tui->game.revealed[pos_new])
-            break;
-
-        tui->cur_i = i_new;
-        tui->cur_j = j_new;
-    }
-
     return true;
 }
 
@@ -309,40 +292,27 @@ static void tui_handle_key(tui_t tui[static 1], char c)
     assert(c);
     assert(c != -1);
 
+    if (!tui_can_be_rendered(tui))
+        return;
+
     bool playing =
         tui->game.state == STATE_BEGIN || tui->game.state == STATE_PLAYING;
 
     switch (c) {
         case KEY_UP:
-            if (tui_move_cursor(tui, -1, 0, false))
+            if (tui_move_cursor(tui, -1, 0))
                 tui->render_pending = true;
             break;
         case KEY_DOWN:
-            if (tui_move_cursor(tui, 1, 0, false))
+            if (tui_move_cursor(tui, 1, 0))
                 tui->render_pending = true;
             break;
         case KEY_LEFT:
-            if (tui_move_cursor(tui, 0, -1, false))
+            if (tui_move_cursor(tui, 0, -1))
                 tui->render_pending = true;
             break;
         case KEY_RIGHT:
-            if (tui_move_cursor(tui, 0, 1, false))
-                tui->render_pending = true;
-            break;
-        case KEY_UP_FAST:
-            if (tui_move_cursor(tui, -1, 0, true))
-                tui->render_pending = true;
-            break;
-        case KEY_DOWN_FAST:
-            if (tui_move_cursor(tui, 1, 0, true))
-                tui->render_pending = true;
-            break;
-        case KEY_LEFT_FAST:
-            if (tui_move_cursor(tui, 0, -1, true))
-                tui->render_pending = true;
-            break;
-        case KEY_RIGHT_FAST:
-            if (tui_move_cursor(tui, 0, 1, true))
+            if (tui_move_cursor(tui, 0, 1))
                 tui->render_pending = true;
             break;
         case KEY_FLAG:

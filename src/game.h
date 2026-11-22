@@ -27,6 +27,21 @@ typedef struct {
     game_state_t state;
 } game_t;
 
+#define GAME_UNFLAT(game, field) \
+    ((typeof (*(game)->field)(*)[(game)->cols])(game)->field)
+#define GAME_UNFLAT_CONST(game, field) \
+    ((typeof(*(game)->field) const(*)[(game)->cols])(game)->field)
+
+#define ITER_NEIGHBORS_RADIUS(game, i, j, r, ni, nj)    \
+    for (int32_t _di = -(r); _di <= (r); ++_di)         \
+        for (int32_t _dj = -(r); _dj <= (r); ++_dj)     \
+            if ((_di != 0 || _dj != 0) &&               \
+                game_in_bounds(game, i + _di, j + _dj)) \
+                for (uint16_t ni = i + _di, nj = j + _dj, _go = 1; _go; _go = 0)
+
+#define ITER_NEIGHBORS(game, i, j, ni, nj) \
+    ITER_NEIGHBORS_RADIUS(game, i, j, 1, ni, nj)
+
 [[nodiscard]] game_t *game_init(game_t *game, uint16_t rows, uint16_t cols,
                                 size_t mine_cnt);
 
@@ -57,8 +72,10 @@ void game_reset(game_t game[static 1]);
     assert(game);
     assert(game_in_bounds(game, i, j));
 
-    size_t pos = (i * game->cols) + j;
-    return !game->revealed[pos] && !game->flagged[pos];
+    auto revealed = GAME_UNFLAT(game, revealed);
+    auto flagged = GAME_UNFLAT(game, flagged);
+
+    return !revealed[i][j] && !flagged[i][j];
 }
 
 [[nodiscard]] static inline int32_t
