@@ -1,6 +1,7 @@
 #include "tui.h"
 #include "ansi.h"
 #include "extra.h"
+#include "game.h"
 #include "input.h"
 #include "solver.h"
 #include <assert.h>
@@ -192,8 +193,7 @@ static void tui_render_status(tui_t const tui[static 1], uint16_t top)
         return;
 
     printf(SGR_RESET);
-    int32_t rem = (int32_t)tui->game.mine_cnt - tui->game.flag_cnt;
-    char *status = aprintf(STATUS_TEXT, rem);
+    char *status = aprintf(STATUS_TEXT, game_remaining_mines(&tui->game));
     if (!status)
         die("aprintf");
 

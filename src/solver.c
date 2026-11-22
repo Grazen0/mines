@@ -1,10 +1,13 @@
 #include "solver.h"
+#include "csp.h"
+#include "extra.h"
 #include "game.h"
 #include <assert.h>
 #include <stddef.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
 // solvers based on https://minesweeperblast.com/minesweeper-solver-algorithms/
 
@@ -249,18 +252,177 @@
     return retval;
 }
 
+typedef enum : uint8_t {
+    VAL_SAFE = 0,
+    VAL_MINE = 1,
+    VAL_UNDETERMINED = 2,
+} cell_value_t;
+
+typedef struct {
+    bool solved;
+    cell_value_t *vals;
+} csp_result_t;
+
+static void csp_callback(void *ctx, size_t n, uint8_t const vals[static n])
+{
+    assert(ctx);
+    csp_result_t *res = ctx;
+
+    if (!res->solved) {
+        res->solved = true;
+        for (size_t i = 0; i < n; ++i)
+            res->vals[i] = vals[i];
+    } else {
+        for (size_t i = 0; i < n; ++i) {
+            if (vals[i] != res->vals[i])
+                res->vals[i] = VAL_UNDETERMINED;
+        }
+    }
+}
+
 [[nodiscard]] static bool solve_level_3(game_t game[static 1])
 {
+    static constexpr uint16_t NIL = (uint16_t)-1;
     assert(game);
-    bool retval = false;
 
-    // this one uses backtracking
+    // this one formulates a CSP out of the known information
+    // and attempts to solve it with csp.c
 
-    return true;
+    int32_t rem = game_remaining_mines(game);
+    if (rem <= 0)
+        return false;
+
+    size_t (*cell_var)[game->cols] =
+        calloc((size_t)game->rows * game->cols, sizeof(**cell_var));
+    if (!cell_var)
+        die("calloc");
+
+    for (uint16_t i = 0; i < game->rows; ++i)
+        for (uint16_t j = 0; j < game->cols; ++j)
+            cell_var[i][j] = NIL;
+
+    size_t cur_var = 0;
+
+    for (uint16_t i = 0; i < game->rows; ++i) {
+        for (uint16_t j = 0; j < game->cols; ++j) {
+            if (!is_boundary_clue(game, i, j))
+                continue;
+
+            for (int32_t di = -1; di <= 1; ++di) {
+                for (int32_t dj = -1; dj <= 1; ++dj) {
+                    if ((di == 0 && dj == 0) ||
+                        !game_in_bounds(game, i + di, j + dj))
+                        continue;
+
+                    uint16_t ni = i + di;
+                    uint16_t nj = j + dj;
+
+                    if (game_is_unknown(game, ni, nj) &&
+                        cell_var[ni][nj] == NIL)
+                        cell_var[ni][nj] = cur_var++;
+                }
+            }
+        }
+    }
+
+    size_t n_vars = cur_var;
+
+    csp_t *csp = csp_create(n_vars);
+
+    // We always consider the constraint
+    // x_1 + x_2 + ... + x_n <= remaining mines.
+    {
+        size_t *cons = calloc(n_vars, sizeof(*cons));
+        if (!cons)
+            die("calloc");
+
+        for (size_t i = 0; i < n_vars; ++i)
+            cons[i] = i;
+
+        if (!csp_add_constraint(csp, n_vars, cons, rem, REL_LEQ))
+            die("csp_add_constraint");
+        free(cons);
+    }
+
+    for (uint16_t i = 0; i < game->rows; ++i) {
+        for (uint16_t j = 0; j < game->cols; ++j) {
+            if (!is_boundary_clue(game, i, j))
+                continue;
+
+            size_t pos = (i * game->cols) + j;
+            uint8_t clue = game->clue[pos];
+            uint8_t f = game_count_neighbors_flagged(game, i, j);
+            if (clue < f)
+                continue;
+
+            size_t n = 0;
+            size_t vars[MAX_NEIGHBORS] = {};
+
+            for (int32_t di = -1; di <= 1; ++di) {
+                for (int32_t dj = -1; dj <= 1; ++dj) {
+                    if ((di == 0 && dj == 0) ||
+                        !game_in_bounds(game, i + di, j + dj))
+                        continue;
+
+                    uint16_t ni = i + di;
+                    uint16_t nj = j + dj;
+
+                    if (cell_var[ni][nj] != NIL) {
+                        assert(game_is_unknown(game, ni, nj));
+                        vars[n++] = cell_var[ni][nj];
+                    }
+                }
+            }
+
+            size_t rhs = clue - f;
+            if (!csp_add_constraint(csp, n, vars, rhs, REL_EQ))
+                die("csp_add_constraint");
+        }
+    }
+
+    csp_result_t res = {
+        .solved = false,
+        .vals = calloc(n_vars, sizeof(*res.vals)),
+    };
+    if (!res.vals)
+        die("calloc");
+
+    if (!csp_solve(csp, &res, csp_callback))
+        die("csp_solve");
+
+    bool retval = true;
+
+    if (!res.solved) {
+        retval = false;
+        goto cleanup;
+    }
+
+    for (uint16_t i = 0; i < game->rows; ++i) {
+        for (uint16_t j = 0; j < game->cols; ++j) {
+            size_t pos = (i * game->cols) + j;
+            uint16_t x = cell_var[i][j];
+            if (x == NIL)
+                continue;
+
+            if (res.vals[x] == VAL_SAFE) {
+                if (!game->revealed[pos])
+                    assert(game_reveal(game, i, j));
+            } else if (res.vals[x] == VAL_MINE) {
+                assert(game_toggle_flag(game, i, j));
+            }
+        }
+    }
+
+cleanup:
+    free(res.vals);
+    csp_destroy(csp);
+    free(cell_var);
+    return retval;
 }
 
 bool solver_step(game_t game[static 1])
 {
     assert(game->state != STATE_LOSE);
+    return solve_level_3(game);
     return solve_level_1(game) || solve_level_2(game) || solve_level_3(game);
 }

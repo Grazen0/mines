@@ -3,6 +3,8 @@
 #include <stddef.h>
 #include <stdint.h>
 
+static constexpr size_t MAX_NEIGHBORS = 8;
+
 [[nodiscard]] uint16_t max_mine_cnt(uint16_t rows, uint16_t cols);
 
 typedef enum : uint8_t {
@@ -57,4 +59,11 @@ void game_reset(game_t game[static 1]);
 
     size_t pos = (i * game->cols) + j;
     return !game->revealed[pos] && !game->flagged[pos];
+}
+
+[[nodiscard]] static inline int32_t
+game_remaining_mines(game_t const game[static 1])
+{
+    assert(game);
+    return (int32_t)game->mine_cnt - game->flag_cnt;
 }
