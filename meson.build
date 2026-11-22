@@ -9,6 +9,7 @@ project(
     'b_sanitize=address,undefined',
     'b_lundef=false',
   ],
+  default_options: 'default_library=static',
 )
 
 add_project_arguments('-D_POSIX_C_SOURCE=200809L', language: 'c')

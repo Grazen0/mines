@@ -25,6 +25,15 @@
         }:
         let
           inherit (pkgs) lib;
+          unity = rec {
+            rev = "2.7.0";
+            src = pkgs.fetchFromGitHub {
+              owner = "ThrowTheSwitch";
+              repo = "Unity";
+              rev = "v${rev}";
+              hash = "sha256-9vCVNdu7e1w0AsCwcLOJXI6EXOaO6zG/PmGjcpsCllw=";
+            };
+          };
         in
         {
           packages = {
@@ -37,8 +46,19 @@
               nativeBuildInputs = with pkgs; [
                 meson
                 ninja
+
+                # Required for Unity
+                python3
                 ruby
               ];
+
+              # Taken from https://github.com/Alexays/Waybar/blob/master/nix/default.nix#L42
+              postUnpack = ''
+                pushd "$sourceRoot"
+                cp -R --no-preserve=ownership ${unity.src} subprojects/Unity-${unity.rev}
+                patchShebangs .
+                popd
+              '';
 
               doCheck = true;
 
