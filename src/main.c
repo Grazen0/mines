@@ -74,6 +74,12 @@ static void parse_args(int argc, char *argv[static argc + 1], args_t *args)
     if (optind < argc)
         args->cols = strtoul(argv[optind++], nullptr, 10);
 
+    if (args->rows <= 0 || args->cols <= 0) {
+        fprintf(stderr, "invalid field dimensions (%u rows x %u cols)\n",
+                args->rows, args->cols);
+        exit(EXIT_FAILURE);
+    }
+
     uint16_t max_mines = max_mine_cnt(args->rows, args->cols);
 
     if (!mines_set) {
