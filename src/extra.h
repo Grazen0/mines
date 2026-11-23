@@ -1,4 +1,5 @@
 #pragma once
+#include <assert.h>
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -37,5 +38,6 @@
 [[noreturn]] static inline void die(char const s[static 1])
 {
     perror(s);
-    exit(EXIT_FAILURE);
+    fflush(stderr);
+    abort();
 }
