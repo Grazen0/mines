@@ -1,4 +1,5 @@
 #include "game.h"
+#include "extra.h"
 #include "memory.h"
 #include <assert.h>
 #include <errno.h>
@@ -14,13 +15,6 @@ uint16_t max_mine_cnt(uint16_t rows, uint16_t cols)
         return 0;
 
     return (rows * cols) - 9;
-}
-
-static size_t rand_sz(size_t min, size_t max) // [min, max)
-{
-    assert(min < max);
-    double r = rand() / ((double)RAND_MAX + 1);
-    return min + (size_t)(r * (double)(max - min));
 }
 
 static void shuffle_partial_sz(size_t n, size_t arr[static n], size_t lim)
@@ -211,12 +205,11 @@ static bool game_reveal_inner(game_t game[static 1], uint16_t i, uint16_t j)
     if (is_mine[i][j]) {
         game->state = STATE_LOSE;
     } else {
-        assert(game->reveal_cnt + game->mine_cnt <= game->rows * game->cols);
-
-        if (game->reveal_cnt + game->mine_cnt == game->rows * game->cols)
-            game_win(game);
-        else if (clue[i][j] == 0)
+        if (clue[i][j] == 0)
             game_reveal_around(game, i, j);
+
+        if (game_safe_cells_left(game) == 0)
+            game_win(game);
     }
 
     return true;

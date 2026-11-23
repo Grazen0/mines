@@ -40,3 +40,10 @@ char *aprintf(char const fmt[static 1], ...)
 
     return retval;
 }
+
+size_t rand_sz(size_t min, size_t max)
+{
+    assert(min < max);
+    double r = rand() / ((double)RAND_MAX + 1);
+    return min + (size_t)(r * (double)(max - min));
+}

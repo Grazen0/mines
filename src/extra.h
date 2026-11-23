@@ -41,3 +41,8 @@
     fflush(stderr);
     abort();
 }
+
+/**
+ * @brief Returns a random size_t in the range [min, max].
+ */
+size_t rand_sz(size_t min, size_t max);

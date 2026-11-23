@@ -91,3 +91,11 @@ game_remaining_mines(game_t const game[static 1])
     assert(i1 != i2 || j1 != j2);
     return abs((int)i1 - i2) <= 1 && abs((int)j1 - j2) <= 1;
 }
+
+[[nodiscard]] static inline size_t
+game_safe_cells_left(game_t const game[static 1])
+{
+    assert(game);
+    assert(game->reveal_cnt + game->mine_cnt <= game->rows * game->cols);
+    return game->reveal_cnt + game->mine_cnt - (game->rows * game->cols);
+}
