@@ -61,7 +61,7 @@ static constexpr color_t COLOR_CLUE[] = {
 #define WIN_ALERT_DETAILS_TEXT " required: %u rows x %u cols "
 
 static constexpr size_t GAME_ARENA_SIZE = 32ULL * 1024;
-static constexpr size_t SOLVER_ARENA_SIZE = 16ULL * 1024;
+static constexpr size_t SOLVER_ARENA_SIZE = 32ULL * 1024;
 
 tui_t *tui_init(tui_t *tui, uint16_t rows, uint16_t cols, size_t mine_cnt)
 {

@@ -6,7 +6,6 @@
 #include <assert.h>
 #include <stddef.h>
 #include <stdint.h>
-#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -243,7 +242,8 @@ static void csp_callback(void *ctx, size_t n, uint8_t const vals[static n])
 
 [[nodiscard]] static bool solve_level_3(arena_t *arena, game_t game[static 1])
 {
-    static constexpr uint16_t NIL = (uint16_t)-1;
+    static constexpr size_t NIL = SIZE_MAX;
+    assert(arena);
     assert(game);
 
     auto clue = GAME_UNFLAT(game, clue);
@@ -261,9 +261,10 @@ static void csp_callback(void *ctx, size_t n, uint8_t const vals[static n])
     if (!cell_var)
         die("MAKE_2D");
 
-    for (uint16_t i = 0; i < game->rows; ++i)
+    for (uint16_t i = 0; i < game->rows; ++i) {
         for (uint16_t j = 0; j < game->cols; ++j)
             cell_var[i][j] = NIL;
+    }
 
     size_t cur_var = 0;
 
@@ -274,8 +275,10 @@ static void csp_callback(void *ctx, size_t n, uint8_t const vals[static n])
 
             ITER_NEIGHBORS(game, i, j, ni, nj)
             {
-                if (game_is_unknown(game, ni, nj) && cell_var[ni][nj] == NIL)
+                if (game_is_unknown(game, ni, nj) && cell_var[ni][nj] == NIL) {
                     cell_var[ni][nj] = cur_var++;
+                    assert(cell_var[ni][nj] != NIL);
+                }
             }
         }
     }
@@ -330,7 +333,7 @@ static void csp_callback(void *ctx, size_t n, uint8_t const vals[static n])
     if (!res.vals)
         die("MAKE");
 
-    memset(res.vals, 0, n_vars * sizeof(res.vals));
+    memset(res.vals, 0, n_vars * sizeof(*res.vals));
 
     if (!csp_solve(csp, arena, &res, csp_callback))
         die("csp_solve");
@@ -344,7 +347,7 @@ static void csp_callback(void *ctx, size_t n, uint8_t const vals[static n])
 
     for (uint16_t i = 0; i < game->rows; ++i) {
         for (uint16_t j = 0; j < game->cols; ++j) {
-            uint16_t x = cell_var[i][j];
+            size_t x = cell_var[i][j];
             if (x == NIL)
                 continue;
 

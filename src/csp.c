@@ -1,4 +1,5 @@
 #include "csp.h"
+#include "extra.h"
 #include "memory.h"
 #include <assert.h>
 #include <errno.h>
@@ -115,8 +116,10 @@ struct var_link_t {
     return vlink_init(MAKE(arena, 1, var_link_t), cons);
 }
 
-static void vlink_prepend(var_link_t **list, var_link_t *link)
+static void vlink_prepend(var_link_t *list[static 1], var_link_t link[static 1])
 {
+    assert(list);
+    assert(link);
     link->next = *list;
     *list = link;
 }
@@ -175,6 +178,8 @@ bool csp_add_constraint(csp_t *csp, arena_t *arena, size_t n,
     for (size_t i = 0; i < n; ++i) {
         assert(vars[i] < csp->n_vars);
         var_link_t *link = vlink_create(arena, cons);
+        if (!link)
+            die("vlink_create");
         vlink_prepend(&csp->var_links[vars[i]], link);
     }
 
